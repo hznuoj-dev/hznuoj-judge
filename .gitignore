@@ -2,8 +2,8 @@
 
 .DS_Store
 
-judge_client.o
-judge_client.cc
+src/judge_client/judge_client.o
+src/judge_client/judge_client
 
-judged.o
-judged.cc
+src/judged/judged.o
+src/judged/judged
