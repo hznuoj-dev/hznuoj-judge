@@ -1,3 +1,9 @@
 .vscode/
 
 .DS_Store
+
+judge_client.o
+judge_client.cc
+
+judged.o
+judged.cc
