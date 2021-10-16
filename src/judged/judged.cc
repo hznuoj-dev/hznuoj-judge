@@ -317,6 +317,7 @@ int _get_jobs_http(int *jobs) {
   while (i <= max_running * 2) jobs[i++] = 0;
   return ret;
 }
+
 #ifdef _mysql_h
 int _get_jobs_mysql(int *jobs) {
   if (mysql_real_query(conn, query, strlen(query))) {
@@ -341,6 +342,7 @@ int _get_jobs_mysql(int *jobs) {
   return ret;
 }
 #endif
+
 int _get_jobs_redis(int *jobs) {
   int ret = 0;
   const char *cmd = "redis-cli -h %s -p %d -a %s --raw rpop %s";
