@@ -1,0 +1,8 @@
+
+*.exe
+
+judge_client/judge_client.o
+judge_client/judge_client
+
+judged/judged.o
+judged/judged
