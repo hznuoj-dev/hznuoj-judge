@@ -18,6 +18,12 @@ docker run -it -d \
 hznuoj-judge:latest
 ```
 
+### Exec
+
+```bash
+docker exec -it hznuoj-judge bash
+```
+
 ## Use sshfs
 
 You may need `sshfs` to remotely mount some data folders.
