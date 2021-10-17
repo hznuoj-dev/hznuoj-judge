@@ -110,8 +110,11 @@ static char lang_ext[19][8] = {"c",   "cc",  "pas", "java", "rb",  "sh",  "py",
 
 int data_list_has(char *file) {
   for (int i = 0; i < data_list_len; i++) {
-    if (strcmp(data_list[i], file) == 0) return 1;
+    if (strcmp(data_list[i], file) == 0) {
+      return 1;
+    }
   }
+
   return 0;
 }
 
@@ -119,6 +122,7 @@ int data_list_add(char *file) {
   if (data_list_len < BUFFER_SIZE - 1) {
     strcpy(data_list[data_list_len], file);
     data_list_len++;
+
     return 0;
   } else {
     return 1;
@@ -147,7 +151,6 @@ void write_log(const char *fmt, ...) {
     system("pwd");
   }
   va_start(ap, fmt);
-  // l =
   vsprintf(buffer, fmt, ap);
   fprintf(fp, "%s\n", buffer);
   if (DEBUG) printf("%s\n", buffer);
@@ -280,7 +283,6 @@ FILE *read_cmd_output(const char *fmt, ...) {
 
 // read the configue file
 void init_mysql_conf() {
-  FILE *fp = NULL;
   char buf[BUFFER_SIZE];
   host_name[0] = 0;
   user_name[0] = 0;
@@ -292,6 +294,8 @@ void init_mysql_conf() {
   strcpy(java_xms, "-Xms32m");
   strcpy(java_xmx, "-Xmx256m");
   sprintf(buf, "%s/etc/judge.conf", oj_home);
+
+  FILE *fp = NULL;
   fp = fopen("./etc/judge.conf", "re");
   if (fp != NULL) {
     while (fgets(buf, BUFFER_SIZE - 1, fp)) {
@@ -317,9 +321,9 @@ void init_mysql_conf() {
       read_int(buf, "OJ_COMPILE_CHROOT", &compile_chroot);
       read_int(buf, "OJ_TURBO_MODE", &turbo_mode);
     }
-    // fclose(fp);
+
+    fclose(fp);
   }
-  //	fclose(fp);
 
   if (strcmp(http_username, "IP") == 0) {
     FILE *fjobs = read_cmd_output(
@@ -327,18 +331,22 @@ void init_mysql_conf() {
     fscanf(fjobs, "%s", http_username);
     pclose(fjobs);
   }
+
   if (strcmp(http_username, "HOSTNAME") == 0) {
     strcpy(http_username, getenv("HOSTNAME"));
   }
+
   if (turbo_mode == 2) tbname = "solution2";
 }
 
 int isInFile(const char fname[]) {
   int l = strlen(fname);
-  if (l <= 3 || strcmp(fname + l - 3, ".in") != 0)
+
+  if (l <= 3 || strcmp(fname + l - 3, ".in") != 0) {
     return 0;
-  else
+  } else {
     return l - 3;
+  }
 }
 
 void find_next_nonspace(int &c1, int &c2, FILE *&f1, FILE *&f2, int &ret) {
@@ -381,20 +389,6 @@ void find_next_nonspace(int &c1, int &c2, FILE *&f1, FILE *&f2, int &ret) {
   }
 }
 
-/***
- int compare_diff(const char *file1,const char *file2){
- char diff[1024];
- sprintf(diff,"diff -q -B -b -w --strip-trailing-cr %s %s",file1,file2);
- int d=system(diff);
- if (d) return OJ_WA;
- sprintf(diff,"diff -q -B --strip-trailing-cr %s %s",file1,file2);
- int p=system(diff);
- if (p) return OJ_PE;
- else return OJ_AC;
-
- }
- */
-
 const char *getFileNameFromPath(const char *path) {
   for (int i = strlen(path); i >= 0; i--) {
     if (path[i] == '/') return &path[i + 1];
@@ -433,7 +427,6 @@ void make_diff_out_simple(FILE *f1, FILE *f2, int c1, int c2,
 /*
  * translated from ZOJ judger r367
  * http://code.google.com/p/zoj/source/browse/trunk/judge_client/client/text_checker.cc#25
- *
  */
 int compare_zoj(const char *file1, const char *file2) {
   int ret = OJ_AC;
@@ -932,21 +925,31 @@ int compile(int lang, char *work_dir) {
                         "-std=c99",
                         "-DONLINE_JUDGE",
                         NULL};
+
   const char *CP_X[] = {"g++", "-fno-asm", "-Wall",      "-O2",
                         "-lm", "--static", "-std=c++11", "-DONLINE_JUDGE",
                         "-o",  "Main",     "Main.cc",    NULL};
+
   const char *CP_P[] = {"fpc", "Main.pas", "-Cs32000000", "-Sh", "-O2",
                         "-Co", "-Ct",      "-Ci",         NULL};
+
   // const char * CP_J[] = { "javac", "-J-Xms32m",
   // "-J-Xmx256m","-encoding","UTF-8", "Main.java",NULL };
 
   const char *CP_R[] = {"ruby", "-c", "Main.rb", NULL};
+
   const char *CP_B[] = {"chmod", "+rx", "Main.sh", NULL};
+
   const char *CP_Y2[] = {"python2", "-m", "py_compile", "Main.py", NULL};
+
   const char *CP_Y3[] = {"python3", "-m", "py_compile", "Main.py", NULL};
+
   const char *CP_PH[] = {"php", "-l", "Main.php", NULL};
+
   const char *CP_PL[] = {"perl", "-c", "Main.pl", NULL};
+
   const char *CP_CS[] = {"mcs", "-warn:0", "Main.cs", NULL};
+
   const char *CP_OC[] = {"gcc",
                          "-o",
                          "Main",
@@ -959,23 +962,31 @@ int compile(int lang, char *work_dir) {
                          "-lobjc",
                          "-lgnustep-base",
                          NULL};
+
   const char *CP_BS[] = {"fbc", "-lang", "qb", "Main.bas", NULL};
+
   const char *CP_CLANG[] = {
       "clang",          "Main.c", "-o",  "Main",     "-O2",
       "-fno-asm",       "-Wall",  "-lm", "--static", "-std=c99",
       "-DONLINE_JUDGE", NULL};
+
   const char *CP_CLANG_CPP[] = {
       "clang++",        "Main.cc", "-o",  "Main",     "-O2",
       "-fno-asm",       "-Wall",   "-lm", "--static", "-std=c++0x",
       "-DONLINE_JUDGE", NULL};
+
   const char *CP_LUA[] = {"luac", "-o", "Main", "Main.lua", NULL};
+
   // const char * CP_JS[] = { "js24","-c", "Main.js", NULL };
+
   const char *CP_GO[] = {"go", "build", "-o", "Main", "Main.go", NULL};
 
   char javac_buf[7][32];
   char *CP_J[7];
 
-  for (int i = 0; i < 7; i++) CP_J[i] = javac_buf[i];
+  for (int i = 0; i < 7; i++) {
+    CP_J[i] = javac_buf[i];
+  }
 
   sprintf(CP_J[0], "javac");
   sprintf(CP_J[1], "-J%s", java_xms);
@@ -1003,13 +1014,16 @@ int compile(int lang, char *work_dir) {
       LIM.rlim_max = STD_MB * 256;
       LIM.rlim_cur = STD_MB * 256;
     }
+
     setrlimit(RLIMIT_AS, &LIM);
+
     if (lang != 2 && lang != 11) {
       freopen("ce.txt", "w", stderr);
       // freopen("/dev/null", "w", stdout);
     } else {
       freopen("ce.txt", "w", stdout);
     }
+
     if (compile_chroot && lang != 3 && lang != 9 && lang != 6 && lang != 11) {
       execute_cmd("mkdir -p bin usr lib lib64 etc/alternatives proc tmp dev");
       execute_cmd("chown judge *");
@@ -1025,6 +1039,7 @@ int compile(int lang, char *work_dir) {
         execute_cmd("mount -o bind /dev dev");
       chroot(work_dir);
     }
+
     while (setgid(1536) != 0) sleep(1);
     while (setuid(1536) != 0) sleep(1);
     while (setresuid(1536, 1536, 1536) != 0) sleep(1);
@@ -1107,19 +1122,6 @@ int compile(int lang, char *work_dir) {
   }
 }
 
-/*
- int read_proc_statm(int pid){
- FILE * pf;
- char fn[4096];
- int ret;
- sprintf(fn,"/proc/%d/statm",pid);
- pf=fopen(fn,"r");
- fscanf(pf,"%d",&ret);
- fclose(pf);
- return ret;
- }
- */
-
 int get_proc_status(int pid, const char *mark) {
   FILE *pf;
   char fn[BUFFER_SIZE], buf[BUFFER_SIZE];
@@ -1127,12 +1129,14 @@ int get_proc_status(int pid, const char *mark) {
   sprintf(fn, "/proc/%d/status", pid);
   pf = fopen(fn, "re");
   int m = strlen(mark);
+
   while (pf && fgets(buf, BUFFER_SIZE - 1, pf)) {
     buf[strlen(buf) - 1] = 0;
     if (strncmp(buf, mark, m) == 0) {
       sscanf(buf + m + 1, "%d", &ret);
     }
   }
+
   if (pf) fclose(pf);
   return ret;
 }
@@ -1590,6 +1594,7 @@ void copy_python_runtime(char *work_dir) {
   execute_cmd("/bin/grep judge /etc/passwd>%s/etc/passwd", work_dir);
   execute_cmd("/bin/mount -o bind /dev %s/dev", work_dir);
 }
+
 void copy_php_runtime(char *work_dir) {
   copy_shell_runtime(work_dir);
   execute_cmd("/bin/mkdir %s/usr", work_dir);
@@ -1754,13 +1759,16 @@ void copy_js_runtime(char *work_dir) {
 void run_solution(int &lang, char *work_dir, int &time_lmt, int &usedtime,
                   int &mem_lmt) {
   nice(19);
-  int py2 = execute_cmd("/bin/grep 'python2' Main.py");
+  // int py2 = execute_cmd("/bin/grep 'python2' Main.py");
+
   // now the user is "judger"
   chdir(work_dir);
+
   // open the files
   freopen("data.in", "r", stdin);
   freopen("user.out", "w", stdout);
   freopen("error.out", "a+", stderr);
+
   // trace me
   if (use_ptrace) ptrace(PTRACE_TRACEME, 0, NULL, NULL);
   // run me
@@ -1770,16 +1778,20 @@ void run_solution(int &lang, char *work_dir, int &time_lmt, int &usedtime,
   while (setuid(1536) != 0) sleep(1);
   while (setresuid(1536, 1536, 1536) != 0) sleep(1);
 
-  //      char java_p1[BUFFER_SIZE], java_p2[BUFFER_SIZE];
+  // char java_p1[BUFFER_SIZE], java_p2[BUFFER_SIZE];
   // child
   // set the limit
   struct rlimit LIM;  // time limit, file limit& memory limit
+
   // time limit
-  if (oi_mode)
+  if (oi_mode) {
     LIM.rlim_cur = time_lmt + 1;
-  else
+  } else {
     LIM.rlim_cur = (time_lmt - usedtime / 1000) + 1;
+  }
+
   LIM.rlim_max = LIM.rlim_cur;
+
   // if(DEBUG) printf("LIM_CPU=%d",(int)(LIM.rlim_cur));
   setrlimit(RLIMIT_CPU, &LIM);
   alarm(0);
@@ -1789,6 +1801,7 @@ void run_solution(int &lang, char *work_dir, int &time_lmt, int &usedtime,
   LIM.rlim_max = STD_F_LIM + STD_MB;
   LIM.rlim_cur = STD_F_LIM;
   setrlimit(RLIMIT_FSIZE, &LIM);
+
   // proc limit
   switch (lang) {
     case 17:
@@ -2088,9 +2101,11 @@ void watch_solution(pid_t pidApp, char *infile, int &ACflg, int isspj,
     }
 
     exitcode = WEXITSTATUS(status);
+
     /*exitcode == 5 waiting for next CPU allocation          * ruby using system
      * to run,exit 17 ok
      *  */
+
     if ((lang >= 3 && exitcode == 17) || exitcode == 0x05 || exitcode == 0)
       // go on and on
       ;
@@ -2215,15 +2230,19 @@ void init_parameters(int argc, char **argv, int &solution_id, int &runner_id) {
             argv[0]);
     exit(1);
   }
+
   DEBUG = (argc > 4);
   record_call = (argc > 5);
+
   if (argc > 5) {
     strcpy(LANG_NAME, argv[5]);
   }
-  if (argc > 3)
+
+  if (argc > 3) {
     strcpy(oj_home, argv[3]);
-  else
+  } else {
     strcpy(oj_home, "/home/judge");
+  }
 
   chdir(oj_home);  // change the dir// init our work
 
@@ -2244,15 +2263,17 @@ int get_sim(int solution_id, int lang, int pid, int &sim_s_id) {
     execute_cmd("/bin/cp %s ../data/%d/ac/%d.%s", src_pth, pid, solution_id,
                 lang_ext[lang]);
     // c cpp will
-    if (lang == 0)
+    if (lang == 0) {
       execute_cmd("/bin/ln ../data/%d/ac/%d.%s ../data/%d/ac/%d.%s", pid,
                   solution_id, lang_ext[lang], pid, solution_id,
                   lang_ext[lang + 1]);
-    if (lang == 1)
+    }
+
+    if (lang == 1) {
       execute_cmd("/bin/ln ../data/%d/ac/%d.%s ../data/%d/ac/%d.%s", pid,
                   solution_id, lang_ext[lang], pid, solution_id,
                   lang_ext[lang - 1]);
-
+    }
   } else {
     FILE *pf;
     pf = fopen("sim", "r");
@@ -2261,6 +2282,7 @@ int get_sim(int solution_id, int lang, int pid, int &sim_s_id) {
       fclose(pf);
     }
   }
+
   if (solution_id <= sim_s_id) sim = 0;
   return sim;
 }
@@ -2296,6 +2318,7 @@ int get_test_file(char *work_dir, int p_id) {
       "--save-cookies=cookie --keep-session-cookies -q -O - "
       "\"%s/admin/problem_judge.php\"";
   FILE *fjobs = read_cmd_output(cmd, p_id, http_baseurl);
+
   while (fgets(filename, BUFFER_SIZE - 1, fjobs) != NULL) {
     sscanf(filename, "%s", filename);
     if (http_judge && (!data_list_has(filename))) data_list_add(filename);
@@ -2306,6 +2329,7 @@ int get_test_file(char *work_dir, int p_id) {
         " wget --post-data=\"gettestdatadate=1&filename=%d/%s\" "
         "--load-cookies=cookie --save-cookies=cookie --keep-session-cookies -q "
         "-O -  \"%s/admin/problem_judge.php\"";
+
     FILE *rcop = read_cmd_output(check_file_cmd, p_id, filename, http_baseurl);
     time_t remote_date, local_date;
     fscanf(rcop, "%ld", &remote_date);
@@ -2553,6 +2577,7 @@ int main(int argc, char **argv) {
       }
       // clean_session(pidApp);
     }
+
     if (oi_mode) {
       if (ACflg == OJ_AC) {
         ++pass_rate;
@@ -2564,6 +2589,7 @@ int main(int argc, char **argv) {
       ACflg = OJ_AC;
     }
   }
+
   if (ACflg == OJ_AC && PEflg == OJ_PE) ACflg = OJ_PE;
   if (DEBUG) printf("sim_enable = %d\n", sim_enable);
   if (sim_enable && ACflg == OJ_AC &&
@@ -2572,18 +2598,22 @@ int main(int argc, char **argv) {
   } else {
     sim = 0;
   }
+
   // if(ACflg == OJ_RE)addreinfo(solution_id);
 
   if ((oi_mode && finalACflg == OJ_RE) || ACflg == OJ_RE) {
     if (DEBUG) printf("add RE info of %d..... \n", solution_id);
     addreinfo(solution_id);
   }
+
   if (use_max_time) {
     usedtime = max_case_time;
   }
+
   if (ACflg == OJ_TL) {
     usedtime = time_lmt * 1000;
   }
+
   if (oi_mode) {
     if (num_of_test > 0) pass_rate /= num_of_test;
     update_solution(solution_id, finalACflg, usedtime, topmemory >> 10, sim,
@@ -2596,17 +2626,26 @@ int main(int argc, char **argv) {
     if (DEBUG) printf("add diff info of %d..... \n", solution_id);
     if (!isspj) adddiffinfo(solution_id);
   }
+
   if (!turbo_mode) update_user(user_id);
   if (!turbo_mode) update_problem(p_id);
+
   clean_workdir(work_dir);
 
-  if (DEBUG) write_log("result=%d", oi_mode ? finalACflg : ACflg);
+  if (DEBUG) {
+    write_log("result=%d", oi_mode ? finalACflg : ACflg);
+  }
+
 #ifdef _mysql_h
-  if (!http_judge) mysql_close(conn);
+  if (!http_judge) {
+    mysql_close(conn);
+  }
 #endif
+
   if (record_call) {
     print_call_array();
   }
+
   closedir(dp);
   return 0;
 }
