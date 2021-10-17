@@ -6,7 +6,7 @@ TOP_DIR="$(dirname "$(realpath "${BASH_SOURCE[0]}")")"
 apt-get update && apt-get -y upgrade
 
 # try install tools
-deps="make flex g++ clang libmysql++-dev php7.0"
+deps="make flex libmysql++-dev g++ clang php7.0"
 
 for pkg in ${deps}
 do
@@ -14,13 +14,15 @@ do
   do
     if ! apt-get install -y "${pkg}"; then
       echo "Network error, install ${pkg} failure, number of retries: ${i}"
+    else
+      break
     fi
   done
 done
 
 # compile and install the core
 cd "${TOP_DIR}/src" || exit 1
-bash ./make.sh
+bash ./build.sh
 
 cp "${TOP_DIR}"/src/judged/judged /usr/bin
 cp "${TOP_DIR}"/src/judge_client/judge_client /usr/bin
@@ -31,7 +33,14 @@ cp "${TOP_DIR}"/src/sim/sim_2_77/sim_text.exe /usr/bin/sim_text
 cp "${TOP_DIR}"/src/sim/sim_2_77/sim_lisp.exe /usr/bin/sim_scm
 cp "${TOP_DIR}"/src/sim/sim.sh /usr/bin
 chmod +x /usr/bin/sim.sh
-rm /usr/bin/sim_cc /usr/bin/sim_rb /usr/bin/sim_sh
+
+for sim_x in /usr/bin/sim_cc /usr/bin/sim_rb /usr/bin/sim_sh
+do
+  if [[ -x "${sim_x}" ]]; then
+    rm "${sim_x}"
+  fi
+done
+
 ln -s /usr/bin/sim_c /usr/bin/sim_cc
 
 # create user and homedir
