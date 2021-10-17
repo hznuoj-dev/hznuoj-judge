@@ -7,10 +7,12 @@ COPY ./ ./hznuoj-judge
 
 RUN sed -i s@/archive.ubuntu.com/@/mirrors.aliyun.com/@g /etc/apt/sources.list \
   && apt-get clean \
-  && bash ./hznuoj-judge/install.sh
+  && bash /root/hznuoj-judge/install.sh \
+  && cp /root/hznuoj-judge/docker/docker-entrypoint.sh /root/docker-entrypoint.sh \
+  && rm -rf /root/hznuoj-judge
 
 VOLUME [ "/home/judge/data" ]
 
-ENTRYPOINT ["/root/hznuoj-judge/docker/docker-entrypoint.sh"]
+ENTRYPOINT ["/root/docker-entrypoint.sh"]
 
 CMD ["/bin/bash"]

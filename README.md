@@ -1,5 +1,18 @@
 # hznuoj-judge
 
+It's based on Ubuntu 20.04 and contains compilers (and interpreters) below:
+
+* GCC 11 (from [PPA](https://launchpad.net/~ubuntu-toolchain-r/+archive/ubuntu/test))
+* Clang 11 (from [LLVM](https://apt.llvm.org/))
+* OpenJDK 11
+* Free Pascal 3
+* Python 2.7 (from [PPA](https://launchpad.net/~deadsnakes/+archive/ubuntu/ppa))
+* Python 3.9 (from [PPA](https://launchpad.net/~deadsnakes/+archive/ubuntu/ppa))
+* Go (from [PPA](https://launchpad.net/~longsleep/+archive/ubuntu/golang-backports))
+* PHP 8.1 (from [PPA](https://launchpad.net/~ondrej/+archive/ubuntu/php))
+* Bash 5.0.17
+
+Each compiler (or interpreter) is available in `$PATH`. It also contains [`testlib.h`](https://github.com/MikeMirzayanov/testlib) in `/usr/include`.
 
 ## Use Docker
 ### Build

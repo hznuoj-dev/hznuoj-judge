@@ -1,28 +1,69 @@
 #! /bin/bash
-set -e -x
+
+set -ex
 
 TOP_DIR="$(dirname "$(realpath "${BASH_SOURCE[0]}")")"
 
-apt-get update && apt-get -y upgrade
+export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:$PATH"
 
-# try install tools
-deps="make flex libmysql++-dev g++ clang php7.0"
+# Install dependencies
+apt-get update
+apt-get dist-upgrade -y
+apt-get install -y gnupg ca-certificates wget
+
+# Key: Ubuntu Toolchain test repo
+apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys 1e9377a2ba9ef27f
+# Key: LLVM repo
+wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | apt-key add -
+# Key: Python repo
+apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys BA6932366A755776
+# Key: Go repo
+apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys F6BC817356A3D45E
+# Key: PHP repo
+apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys 4F4EA0AAE5267A6C
+
+# Add sources
+echo "deb http://ppa.launchpad.net/ubuntu-toolchain-r/test/ubuntu focal main" > /etc/apt/sources.list.d/ubuntu-toolchain-r-ubuntu-test-focal.list
+echo "deb http://apt.llvm.org/focal/ llvm-toolchain-focal-11 main" > /etc/apt/sources.list.d/llvm.list
+echo "deb http://ppa.launchpad.net/deadsnakes/ppa/ubuntu focal main" > /etc/apt/sources.list.d/python.list
+echo "deb http://ppa.launchpad.net/longsleep/golang-backports/ubuntu focal main" >  /etc/apt/sources.list.d/go.list
+echo "deb http://ppa.launchpad.net/ondrej/php/ubuntu focal main" > /etc/apt/sources.list.d/php.list
+
+apt-get update
+
+deps="make libmysql++-dev g++-11-multilib gcc-11-multilib clang-11 libc++-11-dev libc++abi-11-dev openjdk-11-jdk fpc python2.7 python3.9 golang-go php8.1-cli"
 
 for pkg in ${deps}
 do
+  install_ok='n'
+
   for i in $(seq 10)
   do
     if ! apt-get install -y "${pkg}"; then
       echo "Network error, install ${pkg} failure, number of retries: ${i}"
     else
+      install_ok='y'
       break
     fi
   done
+
+  if [[ "${install_ok}" = 'n' ]]; then
+    echo "install ${pkg} failure"
+    exit 1
+  fi
 done
+
+ln -s /usr/bin/g++-11 /usr/local/bin/g++
+ln -s /usr/bin/gcc-11 /usr/local/bin/gcc
+ln -s /usr/bin/clang-11 /usr/local/bin/clang
+ln -s /usr/bin/clang++-11 /usr/local/bin/clang++
+
+# Clean the APT cache
+apt-get clean
 
 # compile and install the core
 cd "${TOP_DIR}/src" || exit 1
-bash ./build.sh
+bash build.sh
 
 cp "${TOP_DIR}"/src/judged/judged /usr/bin
 cp "${TOP_DIR}"/src/judge_client/judge_client /usr/bin
@@ -67,5 +108,3 @@ cp "${TOP_DIR}/src/judged/judged.sh" /etc/init.d/judged
 chmod +x  /etc/init.d/judged
 ln -s /etc/init.d/judged /etc/rc3.d/S93judged
 ln -s /etc/init.d/judged /etc/rc2.d/S93judged
-
-judged
