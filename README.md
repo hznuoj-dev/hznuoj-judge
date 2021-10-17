@@ -12,7 +12,7 @@ It's based on Ubuntu 20.04 and contains compilers (and interpreters) below:
 * PHP 8.1 (from [PPA](https://launchpad.net/~ondrej/+archive/ubuntu/php))
 * Bash 5.0.17
 
-Each compiler (or interpreter) is available in `$PATH`. It also contains [`testlib.h`](https://github.com/MikeMirzayanov/testlib) in `/usr/include`.
+Each compiler (or interpreter) is available in `$PATH`.
 
 ## Use Docker
 ### Build
