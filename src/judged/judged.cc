@@ -84,6 +84,7 @@ void write_log(const char *fmt, ...) {
     fprintf(stderr, "openfile error!\n");
     system("pwd");
   }
+
   va_start(ap, fmt);
   vsprintf(buffer, fmt, ap);
   fprintf(fp, "%s\n", buffer);
@@ -205,12 +206,13 @@ void run_client(int runid, int clientid) {
   // sprintf(err,"%s/run%d/error.out",oj_home,clientid);
   // freopen(err,"a+",stderr);
 
-  if (!DEBUG)
+  if (!DEBUG) {
     execl("/usr/bin/judge_client", "/usr/bin/judge_client", runidstr, buf,
           oj_home, (char *)NULL);
-  else
+  } else {
     execl("/usr/bin/judge_client", "/usr/bin/judge_client", runidstr, buf,
           oj_home, "debug", (char *)NULL);
+  }
 
   // exit(0);
 }
@@ -307,10 +309,8 @@ int _get_jobs_http(int *jobs) {
       "-O - \"%s/admin/problem_judge.php\"";
   FILE *fjobs = read_cmd_output(cmd, oj_lang_set, max_running, http_baseurl);
   while (fscanf(fjobs, "%s", buf) != EOF) {
-    // puts(buf);
     int sid = atoi(buf);
     if (sid > 0) jobs[i++] = sid;
-    // i++;
   }
   pclose(fjobs);
   ret = i;
@@ -346,6 +346,7 @@ int _get_jobs_mysql(int *jobs) {
 int _get_jobs_redis(int *jobs) {
   int ret = 0;
   const char *cmd = "redis-cli -h %s -p %d -a %s --raw rpop %s";
+
   while (ret <= max_running) {
     FILE *fjobs = read_cmd_output(cmd, oj_redisserver, oj_redisport,
                                   oj_redisauth, oj_redisqname);
@@ -357,6 +358,7 @@ int _get_jobs_redis(int *jobs) {
       break;
     }
   }
+
   int i = ret;
   while (i <= max_running * 2) jobs[i++] = 0;
   if (DEBUG) printf("redis return %d jobs", ret);
@@ -440,15 +442,18 @@ int work() {
   //}
 
   // sleep_time=sleep_tmp;
+
   /* get the database info */
   if (!get_jobs(jobs)) {
     return 0;
   }
+
   /* exec the submit */
   for (int j = 0; jobs[j] > 0; j++) {
     runid = jobs[j];
     if (runid % oj_tot != oj_mod) continue;
     if (DEBUG) write_log("Judging solution %d", runid);
+
     if (workcnt >= max_running) {          // if no more client can running
       tmp_pid = waitpid(-1, NULL, 0);      // wait 4 one child exit
       for (i = 0; i < max_running; i++) {  // get the client id
@@ -459,11 +464,11 @@ int work() {
           break;  // got the client id
         }
       }
-    } else {  // have free client
-
+    } else {                             // have free client
       for (i = 0; i < max_running; i++)  // find the client id
         if (ID[i] == 0) break;           // got the client id
     }
+
     if (i < max_running) {
       if (workcnt < max_running && check_out(runid, OJ_CI)) {
         workcnt++;
@@ -479,6 +484,7 @@ int work() {
       }
     }
   }
+
   while ((tmp_pid = waitpid(-1, NULL, 0)) > 0) {
     for (i = 0; i < max_running; i++) {  // get the client id
       if (ID[i] == tmp_pid) {
@@ -490,6 +496,7 @@ int work() {
     }
     printf("tmp_pid = %d\n", tmp_pid);
   }
+
   if (!http_judge) {
 #ifdef _mysql_h
     if (res != NULL) {
@@ -499,7 +506,9 @@ int work() {
     executesql("commit");
 #endif
   }
+
   if (DEBUG && retcnt) write_log("<<%ddone!>>", retcnt);
+
   // free(ID);
   // free(jobs);
   return retcnt;
@@ -518,20 +527,25 @@ int already_running() {
   int fd;
   char buf[16];
   fd = open(lock_file, O_RDWR | O_CREAT, LOCKMODE);
+
   if (fd < 0) {
     syslog(LOG_ERR | LOG_DAEMON, "can't open %s: %s", LOCKFILE,
            strerror(errno));
     exit(1);
   }
+
   if (lockfile(fd) < 0) {
     if (errno == EACCES || errno == EAGAIN) {
       close(fd);
       return 1;
     }
+
     syslog(LOG_ERR | LOG_DAEMON, "can't lock %s: %s", LOCKFILE,
            strerror(errno));
+
     exit(1);
   }
+
   ftruncate(fd, 0);
   sprintf(buf, "%d", getpid());
   write(fd, buf, strlen(buf) + 1);
@@ -541,14 +555,13 @@ int already_running() {
 int daemon_init(void) {
   pid_t pid;
 
-  if ((pid = fork()) < 0)
+  if ((pid = fork()) < 0) {
     return (-1);
-
-  else if (pid != 0)
+  } else if (pid != 0) {
     exit(0); /* parent exit */
+  }
 
   /* child continues */
-
   setsid(); /* become session leader */
 
   chdir(oj_home); /* change working directory */
@@ -557,7 +570,6 @@ int daemon_init(void) {
 
   close(0); /* close stdin */
   close(1); /* close stdout */
-
   close(2); /* close stderr */
 
   int fd = open("/dev/null", O_RDWR);
@@ -585,33 +597,44 @@ void turbo_mode2() {
 int main(int argc, char **argv) {
   DEBUG = (argc > 2);
   ONCE = (argc > 3);
+
   if (argc > 1)
     strcpy(oj_home, argv[1]);
   else
     strcpy(oj_home, "/home/judge");
-  chdir(oj_home);  // change the dir
+
+  // change the dir
+  chdir(oj_home);
 
   sprintf(lock_file, "%s/etc/judge.pid", oj_home);
+
   if (!DEBUG) daemon_init();
+
   if (already_running()) {
     syslog(LOG_ERR | LOG_DAEMON, "This daemon program is already running!\n");
     printf("%s already has one judged on it!\n", oj_home);
     return 1;
   }
-  if (!DEBUG)
+
+  if (!DEBUG) {
     system("/sbin/iptables -A OUTPUT -m owner --uid-owner judge -j DROP");
+  }
+
 //	struct timespec final_sleep;
 //	final_sleep.tv_sec=0;
 //	final_sleep.tv_nsec=500000000;
 #ifdef _mysql_h
   init_mysql_conf();  // set the database info
 #endif
+
   signal(SIGQUIT, call_for_exit);
   signal(SIGKILL, call_for_exit);
   signal(SIGTERM, call_for_exit);
+
   int j = 1;
   int n = 0;
-  while (1) {  // start to run
+  // start to run
+  while (1) {
     while (j && (http_judge
 #ifdef _mysql_h
                  || !init_mysql()
@@ -620,6 +643,7 @@ int main(int argc, char **argv) {
 
       j = work();
       n += j;
+
       if (turbo_mode == 2 && (n > max_running * 10 || j < max_running)) {
         turbo_mode2();
         n = 0;
@@ -627,10 +651,12 @@ int main(int argc, char **argv) {
 
       if (ONCE) break;
     }
+
     turbo_mode2();
     if (ONCE) break;
     sleep(sleep_time);
     j = 1;
   }
+
   return 0;
 }
