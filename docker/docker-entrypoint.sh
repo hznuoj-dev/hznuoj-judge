@@ -2,10 +2,10 @@
 
 set -e -x
 
-judged
+# judged
 
 if [ -z "$*" ]; then
-	/bin/bash
+  /bin/bash
 else
-	exec "$@"
+  exec "$@"
 fi

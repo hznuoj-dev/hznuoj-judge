@@ -10,21 +10,36 @@ It's based on Ubuntu 20.04 and contains compilers (and interpreters) below:
 * Python 3.9 (from [PPA](https://launchpad.net/~deadsnakes/+archive/ubuntu/ppa))
 * Go (from [PPA](https://launchpad.net/~longsleep/+archive/ubuntu/golang-backports))
 * PHP 8.1 (from [PPA](https://launchpad.net/~ondrej/+archive/ubuntu/php))
-* Bash 5.0.17
+* GHC (from [PPA](https://launchpad.net/~hvr/+archive/ubuntu/ghc))
+* C# (from [Mono](https://www.mono-project.com/download/stable/))
+* F# (from [Mono](https://www.mono-project.com/download/stable/))
+* Bash
+* Perl
+* Ruby
+* Lua 5.3
 
 Each compiler (or interpreter) is available in `$PATH`.
 
 ## Use Docker
 ### Build
 
+Direct build:
+
 ```bash
 docker build -t hznuoj-judge:latest -f docker/Dockerfile ./
+```
+
+Step-by-step build:
+
+```bash
+docker build -t hznuoj-sandbox:latest -f docker/Dockerfile.sandbox ./
+docker build -t hznuoj-judge:latest -f docker/Dockerfile.judge ./
 ```
 
 ### Start
 
 ```bash
-docker run -it -d \
+docker run -it --privileged=true --cap-add=SYS_PTRACE -d \
 --name=hznuoj-judge \
 -v /var/hznuoj-judge/judge.conf:/home/judge/etc/judge.conf \
 -v /var/hznuoj-judge/data:/home/judge/data \
@@ -84,3 +99,4 @@ If you want to unmount, you can use the following command:
 ```bash
 sudo umount /var/hznuoj-judge/data
 ```
+

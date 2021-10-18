@@ -1,5 +1,7 @@
 #!/bin/bash
 
+# https://www.dickgrune.com/Programs/similarity_tester/
+
 EXTENSION=$(echo "${1}" | cut -d'.' -f2)
 
 for i in ../data/"${2}"/ac/*."${EXTENSION}"

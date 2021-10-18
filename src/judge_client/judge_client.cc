@@ -103,9 +103,10 @@ static const char *tbname = "solution";
 MYSQL *conn;
 #endif
 
-static char lang_ext[19][8] = {"c",   "cc",  "pas", "java", "rb",  "sh",  "py",
-                               "php", "pl",  "cs",  "m",    "bas", "scm", "c",
-                               "cc",  "lua", "js",  "go",   "py"};
+static char lang_ext[22][8] = {
+    "c",   "cc",  "pas", "java", "rb",  "sh", "py", "php", "pl", "cs", "m",
+    "bas", "scm", "c",   "cc",   "lua", "js", "go", "py",  "cc", "cc", "cc"};
+
 // static char buf[BUFFER_SIZE];
 
 int data_list_has(char *file) {
@@ -183,7 +184,8 @@ void init_syscalls_limits(int lang) {
     for (i = 0; i < call_array_size; i++) {
       call_counter[i] = 0;
     }
-  } else if (lang <= 1 || lang == 13 || lang == 14) {  // C & C++
+  } else if (lang <= 1 || lang == 13 || lang == 14 || lang == 19 ||
+             lang == 20 || lang == 21) {  // C & C++
     for (i = 0; i == 0 || LANG_CV[i]; i++) {
       call_counter[LANG_CV[i]] = HOJ_MAX_LIMIT;
     }
@@ -922,7 +924,7 @@ int compile(int lang, char *work_dir) {
                         "-Wall",
                         "-lm",
                         "--static",
-                        "-std=c99",
+                        "-std=c11",
                         "-DONLINE_JUDGE",
                         NULL};
 
@@ -967,12 +969,12 @@ int compile(int lang, char *work_dir) {
 
   const char *CP_CLANG[] = {
       "clang",          "Main.c", "-o",  "Main",     "-O2",
-      "-fno-asm",       "-Wall",  "-lm", "--static", "-std=c99",
+      "-fno-asm",       "-Wall",  "-lm", "--static", "-std=c11",
       "-DONLINE_JUDGE", NULL};
 
   const char *CP_CLANG_CPP[] = {
       "clang++",        "Main.cc", "-o",  "Main",     "-O2",
-      "-fno-asm",       "-Wall",   "-lm", "--static", "-std=c++0x",
+      "-fno-asm",       "-Wall",   "-lm", "--static", "-std=c++11",
       "-DONLINE_JUDGE", NULL};
 
   const char *CP_LUA[] = {"luac", "-o", "Main", "Main.lua", NULL};
@@ -980,6 +982,18 @@ int compile(int lang, char *work_dir) {
   // const char * CP_JS[] = { "js24","-c", "Main.js", NULL };
 
   const char *CP_GO[] = {"go", "build", "-o", "Main", "Main.go", NULL};
+
+  const char *CP_GXX14[] = {"g++", "-fno-asm", "-Wall",      "-O2",
+                            "-lm", "--static", "-std=c++14", "-DONLINE_JUDGE",
+                            "-o",  "Main",     "Main.cc",    NULL};
+
+  const char *CP_GXX17[] = {"g++", "-fno-asm", "-Wall",      "-O2",
+                            "-lm", "--static", "-std=c++17", "-DONLINE_JUDGE",
+                            "-o",  "Main",     "Main.cc",    NULL};
+
+  const char *CP_GXX20[] = {"g++", "-fno-asm", "-Wall",      "-O2",
+                            "-lm", "--static", "-std=c++20", "-DONLINE_JUDGE",
+                            "-o",  "Main",     "Main.cc",    NULL};
 
   char javac_buf[7][32];
   char *CP_J[7];
@@ -1051,6 +1065,15 @@ int compile(int lang, char *work_dir) {
       case 1:
         execvp(CP_X[0], (char *const *)CP_X);
         break;
+      case 19:
+        execvp(CP_GXX14[0], (char *const *)CP_GXX14);
+        break;
+      case 20:
+        execvp(CP_GXX17[0], (char *const *)CP_GXX17);
+        break;
+      case 21:
+        execvp(CP_GXX20[0], (char *const *)CP_GXX20);
+        break;
       case 2:
         execvp(CP_P[0], (char *const *)CP_P);
         break;
@@ -1078,7 +1101,6 @@ int compile(int lang, char *work_dir) {
       case 9:
         execvp(CP_CS[0], (char *const *)CP_CS);
         break;
-
       case 10:
         execvp(CP_OC[0], (char *const *)CP_OC);
         break;
@@ -1103,7 +1125,11 @@ int compile(int lang, char *work_dir) {
       default:
         printf("nothing to do!\n");
     }
-    if (DEBUG) printf("compile end!\n");
+
+    if (DEBUG) {
+      printf("compile end!\n");
+    }
+
     // exit(!system("cat ce.txt"));
     exit(0);
   } else {
@@ -1112,12 +1138,14 @@ int compile(int lang, char *work_dir) {
     waitpid(pid, &status, 0);
     if (lang > 3 && lang < 7) status = get_file_size("ce.txt");
     if (DEBUG) printf("status=%d\n", status);
+
     execute_cmd(
         "/bin/umount -f bin usr lib lib64 etc/alternatives proc dev 2>&1 "
         ">/dev/null");
-    execute_cmd("/bin/umount -f %s/* 2>&1 >/dev/null", work_dir);
-    umount(work_dir);
 
+    execute_cmd("/bin/umount -f %s/* 2>&1 >/dev/null", work_dir);
+
+    umount(work_dir);
     return status;
   }
 }
@@ -1126,6 +1154,7 @@ int get_proc_status(int pid, const char *mark) {
   FILE *pf;
   char fn[BUFFER_SIZE], buf[BUFFER_SIZE];
   int ret = 0;
+
   sprintf(fn, "/proc/%d/status", pid);
   pf = fopen(fn, "re");
   int m = strlen(mark);
@@ -1137,7 +1166,10 @@ int get_proc_status(int pid, const char *mark) {
     }
   }
 
-  if (pf) fclose(pf);
+  if (pf) {
+    fclose(pf);
+  }
+
   return ret;
 }
 
@@ -1843,6 +1875,9 @@ void run_solution(int &lang, char *work_dir, int &time_lmt, int &usedtime,
     case 13:
     case 14:
     case 17:
+    case 19:
+    case 20:
+    case 21:
       execl("./Main", "./Main", (char *)NULL);
       break;
     case 3:
@@ -2057,35 +2092,52 @@ void watch_solution(pid_t pidApp, char *infile, int &ACflg, int isspj,
   // parent
   int tempmemory;
 
-  if (DEBUG) printf("pid=%d judging %s\n", pidApp, infile);
+  if (DEBUG) {
+    printf("pid=%d judging %s\n", pidApp, infile);
+  }
 
   int status, sig, exitcode;
   struct user_regs_struct reg;
   struct rusage ruse;
-  if (topmemory == 0) topmemory = get_proc_status(pidApp, "VmRSS:") << 10;
+
+  if (topmemory == 0) {
+    topmemory = get_proc_status(pidApp, "VmRSS:") << 10;
+  }
+
   while (1) {
     // check the usage
 
     wait4(pidApp, &status, 0, &ruse);
+
     // jvm gc ask VM before need,so used kernel page fault times and page size
     if (lang == 3 || lang == 7 || lang == 16 || lang == 9 || lang == 17) {
       tempmemory = get_page_fault_mem(ruse, pidApp);
     } else {  // other use VmPeak
       tempmemory = get_proc_status(pidApp, "VmPeak:") << 10;
     }
+
     if (tempmemory > topmemory) topmemory = tempmemory;
+
     if (topmemory > mem_lmt * STD_MB) {
-      if (DEBUG) printf("out of memory %d\n", topmemory);
-      if (ACflg == OJ_AC) ACflg = OJ_ML;
+      if (DEBUG) {
+        printf("out of memory %d\n", topmemory);
+      }
+
+      if (ACflg == OJ_AC) {
+        ACflg = OJ_ML;
+      }
+
       ptrace(PTRACE_KILL, pidApp, NULL, NULL);
       break;
     }
+
     // sig = status >> 8;/*status >> 8
     // Ã¥Â·Â®Ã¤Â¸ÂÃ¥Â¤Å¡Ã¦ËÂ¯EXITCODE*/
 
     if (WIFEXITED(status)) {
       break;
     }
+
     if ((lang < 4 || lang == 9 || lang == 6 || lang == 18) &&
         get_file_size("error.out") && !oi_mode) {
       ACflg = OJ_RE;
@@ -2113,6 +2165,7 @@ void watch_solution(pid_t pidApp, char *infile, int &ACflg, int isspj,
       if (DEBUG) {
         printf("status>>8=%d\n", exitcode);
       }
+
       // psignal(exitcode, NULL);
 
       if (ACflg == OJ_AC) {
@@ -2132,10 +2185,12 @@ void watch_solution(pid_t pidApp, char *infile, int &ACflg, int isspj,
         }
         print_runtimeerror(strsignal(exitcode));
       }
+
       ptrace(PTRACE_KILL, pidApp, NULL, NULL);
 
       break;
     }
+
     if (WIFSIGNALED(status)) {
       /*  WIFSIGNALED: if the process is terminated by signal
        *
@@ -2149,6 +2204,7 @@ void watch_solution(pid_t pidApp, char *infile, int &ACflg, int isspj,
         printf("WTERMSIG=%d\n", sig);
         psignal(sig, NULL);
       }
+
       if (ACflg == OJ_AC) {
         switch (sig) {
           case SIGCHLD:
@@ -2169,6 +2225,7 @@ void watch_solution(pid_t pidApp, char *infile, int &ACflg, int isspj,
       }
       break;
     }
+
     /*     comment from http://www.felix021.com/blog/read.php?1662
 
      WIFSTOPPED: return true if the process is paused or stopped while ptrace is
