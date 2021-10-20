@@ -73,7 +73,7 @@ If you want to mount at boot:
 Append the following line to `/etc/fstab`
 
 ```plain
-sshfs#root@172.22.237.2:/home/judge/data /var/hznuoj-judge/data fuse delay_connect,workaround=rename,idmap=user,allow_other,IdentityFile=~/.ssh/id_rsa 0 0
+sshfs#root@x.x.x.x:/home/judge/data /var/hznuoj-judge/data fuse delay_connect,workaround=rename,idmap=user,allow_other,IdentityFile=~/.ssh/id_rsa 0 0
 ```
 
 And execute `sudo mount -a` to make it effective.
