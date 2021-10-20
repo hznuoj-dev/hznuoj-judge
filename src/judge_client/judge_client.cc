@@ -20,6 +20,7 @@
 #include <time.h>
 #include <unistd.h>
 
+#include "log.h"
 #include "okcalls.h"
 
 #define STD_MB 1048576
@@ -58,6 +59,20 @@ http://code.google.com/p/zoj/source/browse/trunk/judge_client/client/tracer.cc?s
 #define REG_ARG0 rdi
 #define REG_ARG1 rsi
 #endif
+
+#define MOUNT_RO(path) \
+  { execute_cmd("/bin/mount -o bind,sync,ro /" path " " path); }
+
+#define MOUNT_RW(path) \
+  { execute_cmd("/bin/mount -o bind,sync,rw /" path " " path); }
+
+#define UMOUNT(path)                    \
+  {                                     \
+    if (access(path, F_OK) == 0) {      \
+      execute_cmd("/bin/umount " path); \
+      execute_cmd("/bin/rmdir " path);  \
+    }                                   \
+  }
 
 static int DEBUG = 0;
 static char host_name[BUFFER_SIZE];
@@ -104,8 +119,6 @@ static char lang_ext[22][8] = {
     "c",   "cc",  "pas", "java", "rb",  "sh", "py", "php", "pl", "cs", "m",
     "bas", "scm", "c",   "cc",   "lua", "js", "go", "py",  "cc", "cc", "cc"};
 
-// static char buf[BUFFER_SIZE];
-
 int data_list_has(char *file) {
   for (int i = 0; i < data_list_len; i++) {
     if (strcmp(data_list[i], file) == 0) {
@@ -138,45 +151,59 @@ long get_file_size(const char *filename) {
 }
 
 void write_log(const char *fmt, ...) {
-  va_list ap;
   char buffer[4096];
-  //      time_t          t = time(NULL);
-  // int l;
   sprintf(buffer, "%s/log/client.log", oj_home);
+
   FILE *fp = fopen(buffer, "ae+");
+
   if (fp == NULL) {
     fprintf(stderr, "openfile error!\n");
     system("pwd");
   }
+
+  va_list ap;
   va_start(ap, fmt);
+
   vsprintf(buffer, fmt, ap);
   fprintf(fp, "%s\n", buffer);
-  if (DEBUG) printf("%s\n", buffer);
+
+  if (DEBUG) {
+    LOG_INFO("%s\n", buffer);
+  }
+
   va_end(ap);
+
   fclose(fp);
 }
 
 int execute_cmd(const char *fmt, ...) {
+  va_list ap;
+  va_start(ap, fmt);
+
   char cmd[BUFFER_SIZE];
+  vsprintf(cmd, fmt, ap);
+
+  printf("%s\n", cmd);
 
   int ret = 0;
-  va_list ap;
-
-  va_start(ap, fmt);
-  vsprintf(cmd, fmt, ap);
-  printf("%s\n", cmd);
   ret = system(cmd);
+
   va_end(ap);
   return ret;
 }
 
-const int call_array_size = 512;
+const int call_array_size = CALL_ARRAY_SIZE;
+unsigned int call_id = 0;
 int call_counter[call_array_size] = {0};
 static char LANG_NAME[BUFFER_SIZE];
 void init_syscalls_limits(int lang) {
   int i;
   memset(call_counter, 0, sizeof(call_counter));
-  if (DEBUG) write_log("init_call_counter:%d", lang);
+
+  if (DEBUG) {
+    LOG_INFO("init_call_counter:%d", lang);
+  }
+
   if (record_call) {  // recording for debuging
     for (i = 0; i < call_array_size; i++) {
       call_counter[i] = 0;
@@ -254,15 +281,22 @@ bool read_buf(char *buf, const char *key, char *value) {
   if (strncmp(buf, key, strlen(key)) == 0) {
     strcpy(value, buf + after_equal(buf));
     trim(value);
-    if (DEBUG) printf("%s\n", value);
+
+    if (DEBUG) {
+      LOG_INFO("%s\n", value);
+    }
+
     return 1;
   }
+
   return 0;
 }
 
 void read_int(char *buf, const char *key, int *value) {
   char buf2[BUFFER_SIZE];
-  if (read_buf(buf, key, buf2)) sscanf(buf2, "%d", value);
+  if (read_buf(buf, key, buf2)) {
+    sscanf(buf2, "%d", value);
+  }
 }
 
 FILE *read_cmd_output(const char *fmt, ...) {
@@ -274,7 +308,11 @@ FILE *read_cmd_output(const char *fmt, ...) {
   va_start(ap, fmt);
   vsprintf(cmd, fmt, ap);
   va_end(ap);
-  if (DEBUG) printf("%s\n", cmd);
+
+  if (DEBUG) {
+    LOG_INFO("%s\n", cmd);
+  }
+
   ret = popen(cmd, "r");
 
   return ret;
@@ -587,7 +625,6 @@ void login() {
   }
 }
 
-/* write result back to database */
 #ifdef _mysql_h
 void _update_solution_mysql(int solution_id, int result, int time, int memory,
                             int sim, int sim_s_id, double pass_rate) {
@@ -609,12 +646,12 @@ void _update_solution_mysql(int solution_id, int result, int time, int memory,
   }
 
   if (DEBUG) {
-    printf("sql= %s\n", sql);
+    LOG_INFO("sql= %s\n", sql);
   }
 
   if (mysql_real_query(conn, sql, strlen(sql))) {
     if (DEBUG) {
-      printf("..update failed! %s\n", mysql_error(conn));
+      LOG_INFO("..update failed! %s\n", mysql_error(conn));
     }
   }
 
@@ -624,12 +661,12 @@ void _update_solution_mysql(int solution_id, int result, int time, int memory,
             "key update  sim_s_id=%d,sim=%d",
             solution_id, sim_s_id, sim, sim_s_id, sim);
     if (DEBUG) {
-      printf("sql= %s\n", sql);
+      LOG_INFO("sql= %s\n", sql);
     }
 
     if (mysql_real_query(conn, sql, strlen(sql))) {
       if (DEBUG) {
-        printf("..update failed! %s\n", mysql_error(conn));
+        LOG_INFO("..update failed! %s\n", mysql_error(conn));
       }
     }
   }
@@ -666,7 +703,6 @@ void update_solution(int solution_id, int result, int time, int memory, int sim,
   }
 }
 
-/* write compile error message back to database */
 #ifdef _mysql_h
 void _addceinfo_mysql(int solution_id) {
   char sql[(1 << 16)], *end;
@@ -681,7 +717,10 @@ void _addceinfo_mysql(int solution_id) {
 
   while (fgets(cend, 1024, fp)) {
     cend += strlen(cend);
-    if (cend - ceinfo > 40000) break;
+
+    if (cend - ceinfo > 40000) {
+      break;
+    }
   }
 
   cend = 0;
@@ -699,11 +738,11 @@ void _addceinfo_mysql(int solution_id) {
   *end = 0;
 
   if (DEBUG) {
-    printf("%s\n", ceinfo);
+    LOG_INFO("%s\n", ceinfo);
   }
 
   if (mysql_real_query(conn, sql, end - sql)) {
-    printf("%s\n", mysql_error(conn));
+    LOG_ERROR("%s\n", mysql_error(conn));
   }
 
   fclose(fp);
@@ -728,12 +767,14 @@ char *url_encode(char *str) {
   char *pstr = str, *buf = (char *)malloc(strlen(str) * 3 + 1), *pbuf = buf;
   while (*pstr) {
     if (isalnum(*pstr) || *pstr == '-' || *pstr == '_' || *pstr == '.' ||
-        *pstr == '~')
+        *pstr == '~') {
       *pbuf++ = *pstr;
-    else if (*pstr == ' ')
+    } else if (*pstr == ' ') {
       *pbuf++ = '+';
-    else
+    } else {
       *pbuf++ = '%', *pbuf++ = to_hex(*pstr >> 4), *pbuf++ = to_hex(*pstr & 15);
+    }
+
     pstr++;
   }
   *pbuf = '\0';
@@ -776,12 +817,12 @@ void addceinfo(int solution_id) {
   }
 }
 
-/* write runtime error message back to database */
 #ifdef _mysql_h
 void _addreinfo_mysql(int solution_id, const char *filename) {
   char sql[(1 << 16)], *end;
   char reinfo[(1 << 16)], *rend;
   FILE *fp = fopen(filename, "re");
+
   snprintf(sql, (1 << 16) - 1, "DELETE FROM runtimeinfo WHERE solution_id=%d",
            solution_id);
 
@@ -790,7 +831,10 @@ void _addreinfo_mysql(int solution_id, const char *filename) {
 
   while (fgets(rend, 1024, fp)) {
     rend += strlen(rend);
-    if (rend - reinfo > 40000) break;
+
+    if (rend - reinfo > 40000) {
+      break;
+    }
   }
 
   rend = 0;
@@ -808,11 +852,11 @@ void _addreinfo_mysql(int solution_id, const char *filename) {
   *end = 0;
 
   if (DEBUG) {
-    printf("%s\n", reinfo);
+    LOG_INFO("%s\n", reinfo);
   }
 
   if (mysql_real_query(conn, sql, end - sql)) {
-    printf("%s\n", mysql_error(conn));
+    LOG_ERROR("%s\n", mysql_error(conn));
   }
 
   fclose(fp);
@@ -969,22 +1013,33 @@ void update_problem(int pid) {
 }
 
 void umount(char *work_dir) {
-  execute_cmd("/bin/umount -f %s/proc", work_dir);
-  execute_cmd("/bin/umount -f %s/dev ", work_dir);
-  execute_cmd("/bin/umount -f %s/lib ", work_dir);
-  execute_cmd("/bin/umount -f %s/lib64 ", work_dir);
-  execute_cmd("/bin/umount -f %s/etc/alternatives ", work_dir);
-  execute_cmd("/bin/umount -f %s/usr ", work_dir);
-  execute_cmd("/bin/umount -f %s/bin ", work_dir);
-  execute_cmd("/bin/umount -f %s/proc ", work_dir);
-  execute_cmd("/bin/umount -f bin usr lib lib64 etc/alternatives proc dev ");
-  execute_cmd("/bin/umount -f %s/* ", work_dir);
-  execute_cmd("/bin/umount -f %s/log/* ", work_dir);
-  execute_cmd("/bin/umount -f %s/log/etc/alternatives ", work_dir);
+  if (chdir(work_dir)) {
+    exit(-1);
+  }
+
+  UMOUNT("usr");
+  UMOUNT("bin");
+  UMOUNT("lib");
+  UMOUNT("lib32");
+  UMOUNT("libx32");
+  UMOUNT("etc");
+  UMOUNT("proc");
+  UMOUNT("dev");
+  UMOUNT("lib64");
+
+  // execute_cmd("/bin/rmdir %s/* ", work_dir);
 }
 
 int compile(int lang, char *work_dir) {
-  int pid;
+  // python/js don't compile
+  if (lang == 6 || lang == 16 || lang == 18) {
+    return 0;
+  }
+
+  if (chdir(work_dir)) {
+    LOG_ERROR("chdir %s failure", work_dir);
+    return 1;
+  }
 
   const char *CP_C[] = {"gcc",
                         "Main.c",
@@ -1008,6 +1063,21 @@ int compile(int lang, char *work_dir) {
 
   // const char * CP_J[] = { "javac", "-J-Xms32m",
   // "-J-Xmx256m","-encoding","UTF-8", "Main.java",NULL };
+
+  char javac_buf[7][32];
+  char *CP_J[7];
+
+  for (int i = 0; i < 7; i++) {
+    CP_J[i] = javac_buf[i];
+  }
+
+  sprintf(CP_J[0], "javac");
+  sprintf(CP_J[1], "-J%s", java_xms);
+  sprintf(CP_J[2], "-J%s", java_xmx);
+  sprintf(CP_J[3], "-encoding");
+  sprintf(CP_J[4], "UTF-8");
+  sprintf(CP_J[5], "Main.java");
+  CP_J[6] = (char *)NULL;
 
   const char *CP_R[] = {"ruby", "-c", "Main.rb", NULL};
 
@@ -1050,7 +1120,7 @@ int compile(int lang, char *work_dir) {
 
   const char *CP_LUA[] = {"luac", "-o", "Main", "Main.lua", NULL};
 
-  // const char * CP_JS[] = { "js24","-c", "Main.js", NULL };
+  // const char *CP_JS[] = {"js24", "-c", "Main.js", NULL};
 
   const char *CP_GO[] = {"go", "build", "-o", "Main", "Main.go", NULL};
 
@@ -1066,63 +1136,77 @@ int compile(int lang, char *work_dir) {
                             "-lm", "--static", "-std=c++20", "-DONLINE_JUDGE",
                             "-o",  "Main",     "Main.cc",    NULL};
 
-  char javac_buf[7][32];
-  char *CP_J[7];
-
-  for (int i = 0; i < 7; i++) {
-    CP_J[i] = javac_buf[i];
-  }
-
-  sprintf(CP_J[0], "javac");
-  sprintf(CP_J[1], "-J%s", java_xms);
-  sprintf(CP_J[2], "-J%s", java_xmx);
-  sprintf(CP_J[3], "-encoding");
-  sprintf(CP_J[4], "UTF-8");
-  sprintf(CP_J[5], "Main.java");
-  CP_J[6] = (char *)NULL;
-
-  pid = fork();
+  int pid = fork();
   if (pid == 0) {
     struct rlimit LIM;
     LIM.rlim_max = 6;
     LIM.rlim_cur = 6;
     setrlimit(RLIMIT_CPU, &LIM);
+
     alarm(6);
+
     LIM.rlim_max = 10 * STD_MB;
     LIM.rlim_cur = 10 * STD_MB;
     setrlimit(RLIMIT_FSIZE, &LIM);
 
-    if (lang == 3 || lang == 17) {
+    if (lang == 2 || lang == 3 || lang == 17) {
       LIM.rlim_max = STD_MB << 11;
       LIM.rlim_cur = STD_MB << 11;
     } else {
       LIM.rlim_max = STD_MB * 256;
       LIM.rlim_cur = STD_MB * 256;
     }
-
     setrlimit(RLIMIT_AS, &LIM);
 
     if (lang != 2 && lang != 11) {
-      freopen("ce.txt", "w", stderr);
+      stderr = freopen("ce.txt", "w", stderr);
       // freopen("/dev/null", "w", stdout);
     } else {
-      freopen("ce.txt", "w", stdout);
+      stdout = freopen("ce.txt", "w", stdout);
     }
 
-    if (compile_chroot && lang != 3 && lang != 9 && lang != 6 && lang != 11) {
-      execute_cmd("mkdir -p bin usr lib lib64 etc/alternatives proc tmp dev");
-      execute_cmd("chown judge *");
-      execute_cmd("mount -o bind /bin bin");
-      execute_cmd("mount -o bind /usr usr");
-      execute_cmd("mount -o bind /lib lib");
-#ifndef __i386
-      execute_cmd("mount -o bind /lib64 lib64");
+    execute_cmd("/bin/chown judge %s ", work_dir);
+    execute_cmd("/bin/chmod 750 %s ", work_dir);
+
+    if (compile_chroot && lang != 3 && lang != 9 && lang != 6 && lang != 11 &&
+        lang != 5) {
+      if (DEBUG) {
+        LOG_INFO("start mount compile file");
+      }
+
+      if (access("usr", F_OK) == -1) {
+        execute_cmd(
+            "mkdir -p root/.cache/go-build tmp usr bin lib lib32 libx32 etc "
+            "proc");
+
+        execute_cmd("chown judge -R root tmp");
+
+        MOUNT_RO("usr");
+        MOUNT_RO("bin");
+        MOUNT_RO("lib");
+        MOUNT_RO("lib32");
+        MOUNT_RO("libx32");
+        MOUNT_RO("etc");
+        MOUNT_RO("proc");
+
+        if (lang > 2 && lang < 19 && lang != 13 && lang != 14 && lang != 6 &&
+            lang != 18 && lang != 10) {
+          execute_cmd("mkdir -p dev");
+          MOUNT_RO("dev");
+        }
+
+#ifndef __i386__
+        execute_cmd("mkdir -p lib64");
+        MOUNT_RO("lib64");
 #endif
-      execute_cmd("mount -o bind /etc/alternatives etc/alternatives");
-      execute_cmd("mount -o bind /proc proc");
-      if (lang > 2 && lang != 10 && lang != 13 && lang != 14)
-        execute_cmd("mount -o bind /dev dev");
-      chroot(work_dir);
+      }
+
+      if (chroot(work_dir)) {
+        LOG_ERROR("warning chroot fail!\n");
+        return 1;
+      }
+
+      LOG_INFO("end mount compile file");
     }
 
     while (setgid(1536) != 0) sleep(1);
@@ -1135,15 +1219,6 @@ int compile(int lang, char *work_dir) {
         break;
       case 1:
         execvp(CP_X[0], (char *const *)CP_X);
-        break;
-      case 19:
-        execvp(CP_GXX14[0], (char *const *)CP_GXX14);
-        break;
-      case 20:
-        execvp(CP_GXX17[0], (char *const *)CP_GXX17);
-        break;
-      case 21:
-        execvp(CP_GXX20[0], (char *const *)CP_GXX20);
         break;
       case 2:
         execvp(CP_P[0], (char *const *)CP_P);
@@ -1159,9 +1234,6 @@ int compile(int lang, char *work_dir) {
         break;
       case 6:
         execvp(CP_Y2[0], (char *const *)CP_Y2);
-        break;
-      case 18:
-        execvp(CP_Y3[0], (char *const *)CP_Y3);
         break;
       case 7:
         execvp(CP_PH[0], (char *const *)CP_PH);
@@ -1188,35 +1260,43 @@ int compile(int lang, char *work_dir) {
         execvp(CP_LUA[0], (char *const *)CP_LUA);
         break;
       // case 16:
-      //	execvp(CP_JS[0], (char * const *) CP_JS);
-      //	break;
+      //   execvp(CP_JS[0], (char *const *)CP_JS);
+      //   break;
       case 17:
         execvp(CP_GO[0], (char *const *)CP_GO);
         break;
+      case 18:
+        execvp(CP_Y3[0], (char *const *)CP_Y3);
+        break;
+      case 19:
+        execvp(CP_GXX14[0], (char *const *)CP_GXX14);
+        break;
+      case 20:
+        execvp(CP_GXX17[0], (char *const *)CP_GXX17);
+        break;
+      case 21:
+        execvp(CP_GXX20[0], (char *const *)CP_GXX20);
+        break;
       default:
-        printf("nothing to do!\n");
+        LOG_INFO("nothing to do!\n");
     }
 
     if (DEBUG) {
-      printf("compile end!\n");
+      LOG_INFO("compile end!\n");
     }
 
-    // exit(!system("cat ce.txt"));
     exit(0);
   } else {
     int status = 0;
-
     waitpid(pid, &status, 0);
-    if (lang > 3 && lang < 7) status = get_file_size("ce.txt");
-    if (DEBUG) {
-      printf("status=%d\n", status);
+
+    if (lang > 3 && lang < 7) {
+      status = get_file_size("ce.txt");
     }
 
-    execute_cmd(
-        "/bin/umount -f bin usr lib lib64 etc/alternatives proc dev 2>&1 "
-        ">/dev/null");
-
-    execute_cmd("/bin/umount -f %s/* 2>&1 >/dev/null", work_dir);
+    if (DEBUG) {
+      LOG_INFO("status=%d\n", status);
+    }
 
     umount(work_dir);
     return status;
@@ -1281,7 +1361,6 @@ int init_mysql_conn() {
 void _get_solution_mysql(int solution_id, char *work_dir, int lang) {
   char sql[BUFFER_SIZE], src_pth[BUFFER_SIZE];
 
-  // get the source code
   MYSQL_RES *res;
   MYSQL_ROW row;
 
@@ -1296,14 +1375,15 @@ void _get_solution_mysql(int solution_id, char *work_dir, int lang) {
   sprintf(src_pth, "Main.%s", lang_ext[lang]);
 
   if (DEBUG) {
-    printf("Main=%s", src_pth);
+    LOG_INFO("Main=%s", src_pth);
   }
 
   FILE *fp_src = fopen(src_pth, "we");
   fprintf(fp_src, "%s", row[0]);
 
   if (res != NULL) {
-    mysql_free_result(res);  // free the memory
+    // free the memory
+    mysql_free_result(res);
     res = NULL;
   }
 
@@ -1316,7 +1396,10 @@ void _get_solution_http(int solution_id, char *work_dir, int lang) {
 
   // create the src file
   sprintf(src_pth, "Main.%s", lang_ext[lang]);
-  if (DEBUG) printf("Main=%s", src_pth);
+
+  if (DEBUG) {
+    LOG_INFO("Main=%s", src_pth);
+  }
 
   // login();
 
@@ -1343,7 +1426,7 @@ void get_solution(int solution_id, char *work_dir, int lang) {
 #ifdef _mysql_h
 void _get_custominput_mysql(int solution_id, char *work_dir) {
   char sql[BUFFER_SIZE], src_pth[BUFFER_SIZE];
-  // get the source code
+
   MYSQL_RES *res;
   MYSQL_ROW row;
 
@@ -1412,7 +1495,7 @@ void _get_solution_info_mysql(int solution_id, int &p_id, char *user_id,
         solution_id);
 
     if (DEBUG) {
-      printf("%s\n", sql);
+      LOG_INFO("%s\n", sql);
     }
 
     mysql_real_query(conn, sql, strlen(sql));
@@ -1423,7 +1506,7 @@ void _get_solution_info_mysql(int solution_id, int &p_id, char *user_id,
             solution_id);
 
     if (DEBUG) {
-      printf("%s\n", sql);
+      LOG_INFO("%s\n", sql);
     }
 
   } else {
@@ -1434,7 +1517,7 @@ void _get_solution_info_mysql(int solution_id, int &p_id, char *user_id,
   }
 
   if (DEBUG) {
-    printf("%s\n", sql);
+    LOG_INFO("%s\n", sql);
   }
 
   mysql_real_query(conn, sql, strlen(sql));
@@ -1444,8 +1527,8 @@ void _get_solution_info_mysql(int solution_id, int &p_id, char *user_id,
   strcpy(user_id, row[1]);
 
   if (DEBUG) {
-    printf("sql=%s\n", sql);
-    printf("lang_raw_str = %s\n", row[2]);
+    LOG_INFO("sql=%s\n", sql);
+    LOG_INFO("lang_raw_str = %s\n", row[2]);
   }
 
   lang = atoi(row[2]);
@@ -1559,14 +1642,16 @@ void prepare_files(char *filename, int namelen, char *infile, int &p_id,
                    int runner_id) {
   char fname0[BUFFER_SIZE];
   char fname[BUFFER_SIZE];
+
   strncpy(fname0, filename, namelen);
   fname0[namelen] = 0;
   escape(fname, fname0);
-  printf("%s\n%s\n", fname0, fname);
+
+  LOG_INFO("\nraw filename: %s\nescape filename: %s\n", fname0, fname);
+
   sprintf(infile, "%s/data/%d/%s.in", oj_home, p_id, fname);
 
   execute_cmd("/bin/cp '%s' %s/data.in", infile, work_dir);
-  execute_cmd("/bin/cp %s/data/%d/*.dic %s/", oj_home, p_id, work_dir);
 
   sprintf(outfile, "%s/data/%d/%s.out", oj_home, p_id, fname0);
   sprintf(userfile, "%s/run%d/user.out", oj_home, runner_id);
@@ -1577,14 +1662,70 @@ void copy_shell_runtime(char *work_dir) {
   execute_cmd("/bin/mkdir %s/lib64", work_dir);
   execute_cmd("/bin/mkdir %s/bin", work_dir);
 
-#ifdef __i386
-  execute_cmd("/bin/cp /lib/ld-linux* %s/lib/", work_dir);
-  execute_cmd("/bin/cp -a /lib/i386-linux-gnu  %s/lib/", work_dir);
-  execute_cmd("/bin/cp -a /usr/lib/i386-linux-gnu %s/lib/", work_dir);
+#ifdef __mips__
+  execute_cmd(
+      "/bin/cp -a /lib/mips64el-linux-gnuabi64/  "
+      "%s/lib/mips64el-linux-gnuabi64",
+      work_dir);
+  execute_cmd("mkdir -p %s/lib/mips64el-linux-gnuabi64/", work_dir);
+  execute_cmd("/bin/cp -a /lib64/ld.so.1  %s/lib64/", work_dir);
+  execute_cmd(
+      "/bin/cp -a /lib/mips64el-linux-gnuabi64/libdl.so.2  "
+      "%s/lib/mips64el-linux-gnuabi64",
+      work_dir);
+  execute_cmd(
+      "/bin/cp -a /lib/mips64el-linux-gnuabi64/libutil.so.1  "
+      "%s/lib/mips64el-linux-gnuabi64",
+      work_dir);
+  execute_cmd(
+      "/bin/cp -a /lib/mips64el-linux-gnuabi64/libz.so.1  "
+      "%s/lib/mips64el-linux-gnuabi64",
+      work_dir);
+  execute_cmd(
+      "/bin/cp -a /lib/mips64el-linux-gnuabi64/libm.so.6  "
+      "%s/lib/mips64el-linux-gnuabi64",
+      work_dir);
+  execute_cmd(
+      "/bin/cp -a /lib/mips64el-linux-gnuabi64/libc.so.6  "
+      "%s/lib/mips64el-linux-gnuabi64",
+      work_dir);
+  execute_cmd(
+      "/bin/cp -a /lib/mips64el-linux-gnuabi64/libtinfo.so.5  "
+      "%s/lib/mips64el-linux-gnuabi64",
+      work_dir);
+  execute_cmd(
+      "/bin/cp -a /lib/mips64el-linux-gnuabi64/ld-2.24.so  "
+      "%s/lib/mips64el-linux-gnuabi64",
+      work_dir);
+  execute_cmd(
+      "/bin/cp -a /lib/mips64el-linux-gnuabi64/libc-2.24.so  "
+      "%s/lib/mips64el-linux-gnuabi64",
+      work_dir);
+  execute_cmd("/bin/cp -a /lib64/libc.so.6 %s/lib64/", work_dir);
+  execute_cmd("/bin/cp -a /lib64/libtinfo.so.6  %s/lib64/", work_dir);
+  execute_cmd("/bin/cp -a /lib64/ld-2.27.so  %s/lib64/", work_dir);
+  execute_cmd("/bin/cp -a /lib64/libc-2.27.so %s/lib64/", work_dir);
+  execute_cmd("/bin/cp -a /lib64/libdl-2.27.so %s/lib64/", work_dir);
+  execute_cmd("/bin/cp -a /lib64/libtinfo.so.6.1 %s/lib64/", work_dir);
+  execute_cmd(
+      "cp  /lib/mips64el-linux-gnuabi64/libpthread.so.0 "
+      "%s/lib/mips64el-linux-gnuabi64/",
+      work_dir);
+  execute_cmd("/bin/cp -a /bin/bash %s/bin/", work_dir);
+
 #endif
 
-  execute_cmd("/bin/cp -a /lib/x86_64-linux-gnu %s/lib/", work_dir);
-  execute_cmd("/bin/cp /lib64/* %s/lib64/", work_dir);
+#ifdef __i386
+  execute_cmd("/bin/cp /lib/ld-linux* %s/lib/", work_dir);
+  execute_cmd("/bin/cp -a /lib/i386-linux-gnu/  %s/lib/", work_dir);
+//	execute_cmd("/bin/cp -a /usr/lib/i386-linux-gnu %s/lib/", work_dir);
+#endif
+
+#ifdef __x86_64__
+  execute_cmd("mount -o bind /lib %s/lib", work_dir);
+  execute_cmd("mount -o bind /lib64 %s/lib64", work_dir);
+#endif
+
   //	execute_cmd("/bin/cp /lib32 %s/", work_dir);
   execute_cmd("/bin/cp /bin/busybox %s/bin/", work_dir);
   execute_cmd("/bin/ln -s /bin/busybox %s/bin/sh", work_dir);
@@ -1662,8 +1803,6 @@ void copy_objc_runtime(char *work_dir) {
 }
 
 void copy_bash_runtime(char *work_dir) {
-  // char cmd[BUFFER_SIZE];
-  // const char * ruby_run="/usr/bin/ruby";
   copy_shell_runtime(work_dir);
   execute_cmd("/bin/cp `which bc`  %s/bin/", work_dir);
   execute_cmd("busybox dos2unix Main.sh", work_dir);
@@ -1686,24 +1825,28 @@ void copy_bash_runtime(char *work_dir) {
 
 void copy_ruby_runtime(char *work_dir) {
   copy_shell_runtime(work_dir);
-  execute_cmd("mkdir -p %s/usr", work_dir);
+  execute_cmd("mkdir -p %s/usr/bin", work_dir);
   execute_cmd("mkdir -p %s/usr/lib", work_dir);
   execute_cmd("mkdir -p %s/usr/lib64", work_dir);
   execute_cmd("cp -a /usr/lib/libruby* %s/usr/lib/", work_dir);
   execute_cmd("cp -a /usr/lib/ruby* %s/usr/lib/", work_dir);
   execute_cmd("cp -a /usr/lib64/ruby* %s/usr/lib64/", work_dir);
   execute_cmd("cp -a /usr/lib64/libruby* %s/usr/lib64/", work_dir);
+  execute_cmd("cp -a /usr/bin/ruby* %s/usr/bin", work_dir);
+
+#ifdef __x86_64__
   execute_cmd("/bin/cp -a /usr/lib/x86_64-linux-gnu/libruby* %s/usr/lib/",
               work_dir);
   execute_cmd("/bin/cp -a /usr/lib/x86_64-linux-gnu/libgmp* %s/usr/lib/",
               work_dir);
-  execute_cmd("cp -a /usr/bin/ruby* %s/", work_dir);
+#endif
 }
 
 void copy_guile_runtime(char *work_dir) {
   copy_shell_runtime(work_dir);
   execute_cmd("/bin/mkdir -p %s/proc", work_dir);
   execute_cmd("/bin/mount -o bind /proc %s/proc", work_dir);
+  execute_cmd("/bin/mkdir -p %s/usr/bin", work_dir);
   execute_cmd("/bin/mkdir -p %s/usr/lib", work_dir);
   execute_cmd("/bin/mkdir -p %s/usr/share", work_dir);
   execute_cmd("/bin/cp -a /usr/share/guile %s/usr/share/", work_dir);
@@ -1716,7 +1859,9 @@ void copy_guile_runtime(char *work_dir) {
   execute_cmd("/bin/cp /usr/lib/libgmp* %s/usr/lib/", work_dir);
   execute_cmd("/bin/cp /usr/lib/*/libltdl* %s/usr/lib/", work_dir);
   execute_cmd("/bin/cp /usr/lib/libltdl* %s/usr/lib/", work_dir);
-  execute_cmd("/bin/cp /usr/bin/guile* %s/", work_dir);
+  execute_cmd("/bin/cp /usr/bin/guile* %s/usr/bin", work_dir);
+
+#ifdef __x86_64__
   execute_cmd("/bin/cp -a /usr/lib/x86_64-linux-gnu/libguile* %s/usr/lib/",
               work_dir);
   execute_cmd("/bin/cp -a /usr/lib/x86_64-linux-gnu/libgc* %s/usr/lib/",
@@ -1725,6 +1870,7 @@ void copy_guile_runtime(char *work_dir) {
               work_dir);
   execute_cmd("/bin/cp -a /usr/lib/x86_64-linux-gnu/libunistring* %s/usr/lib/",
               work_dir);
+#endif
 }
 
 void copy_python_runtime(char *work_dir) {
@@ -1749,7 +1895,7 @@ void copy_python_runtime(char *work_dir) {
 
 void copy_php_runtime(char *work_dir) {
   copy_shell_runtime(work_dir);
-  execute_cmd("/bin/mkdir %s/usr", work_dir);
+  execute_cmd("/bin/mkdir -p %s/usr/bin", work_dir);
   execute_cmd("/bin/mkdir %s/usr/lib", work_dir);
   execute_cmd("/bin/cp /usr/lib/libedit* %s/usr/lib/", work_dir);
   execute_cmd("/bin/cp /usr/lib/libdb* %s/usr/lib/", work_dir);
@@ -1762,6 +1908,7 @@ void copy_php_runtime(char *work_dir) {
   execute_cmd("/bin/cp /usr/lib/*/libkrb5* %s/usr/lib/", work_dir);
   execute_cmd("/bin/cp /usr/lib/*/libk5crypto* %s/usr/lib/", work_dir);
   execute_cmd("/bin/cp /usr/lib/libxml2* %s/usr/lib/", work_dir);
+#ifdef __x86_64__
   execute_cmd("/bin/cp /usr/lib/x86_64-linux-gnu/libxml2.so* %s/usr/lib/",
               work_dir);
   execute_cmd("/bin/cp /usr/lib/x86_64-linux-gnu/libicuuc.so* %s/usr/lib/",
@@ -1774,7 +1921,8 @@ void copy_php_runtime(char *work_dir) {
               work_dir);
   execute_cmd("/bin/cp /usr/lib/x86_64-linux-gnu/libcrypto* %s/usr/lib/",
               work_dir);
-  execute_cmd("/bin/cp /usr/bin/php* %s/", work_dir);
+#endif
+  execute_cmd("/bin/cp /usr/bin/php* %s/usr/bin", work_dir);
   execute_cmd("chmod +rx %s/Main.php", work_dir);
 }
 
@@ -1797,7 +1945,7 @@ void copy_freebasic_runtime(char *work_dir) {
 
 void copy_mono_runtime(char *work_dir) {
   copy_shell_runtime(work_dir);
-  execute_cmd("/bin/mkdir %s/usr", work_dir);
+  execute_cmd("/bin/mkdir -p %s/usr/bin", work_dir);
   execute_cmd("/bin/mkdir %s/proc", work_dir);
   execute_cmd("/bin/mkdir -p %s/usr/lib/mono/2.0", work_dir);
   execute_cmd("/bin/cp -a /usr/lib/mono %s/usr/lib/", work_dir);
@@ -1807,7 +1955,7 @@ void copy_mono_runtime(char *work_dir) {
   execute_cmd("/bin/cp /usr/lib/libgthread* %s/usr/lib/", work_dir);
 
   execute_cmd("/bin/mount -o bind /proc %s/proc", work_dir);
-  execute_cmd("/bin/cp /usr/bin/mono* %s/", work_dir);
+  execute_cmd("/bin/cp /usr/bin/mono* %s/usr", work_dir);
 
   execute_cmd("/bin/cp /usr/lib/libgthread* %s/usr/lib/", work_dir);
   execute_cmd("/bin/cp /lib/libglib* %s/lib/", work_dir);
@@ -1815,7 +1963,31 @@ void copy_mono_runtime(char *work_dir) {
               work_dir);
   execute_cmd("/bin/cp /lib/libpcre* %s/lib/", work_dir);
   execute_cmd("/bin/cp /lib/ld-linux* %s/lib/", work_dir);
+#ifdef __x86_64__
   execute_cmd("/bin/cp /lib64/ld-linux* %s/lib64/", work_dir);
+  execute_cmd("/bin/mkdir -p %s/usr/lib/x86_64-linux-gnu", work_dir);
+  execute_cmd(
+      "/bin/cp /usr/lib/x86_64-linux-gnu/libm.so.6 "
+      "%s/usr/lib/x86_64-linux-gnu/",
+      work_dir);
+  execute_cmd(
+      "/bin/cp /usr/lib/x86_64-linux-gnu/librt.so.1 "
+      "%s/usr/lib/x86_64-linux-gnu/",
+      work_dir);
+  execute_cmd(
+      "/bin/cp /usr/lib/x86_64-linux-gnu/libpthread.so.0 "
+      "%s/usr/lib/x86_64-linux-gnu/",
+      work_dir);
+  execute_cmd(
+      "/bin/cp /usr/lib/x86_64-linux-gnu/libgcc_s.so.1 "
+      "%s/usr/lib/x86_64-linux-gnu/",
+      work_dir);
+  execute_cmd(
+      "/bin/cp /usr/lib/x86_64-linux-gnu/libc.so.6 "
+      "%s/usr/lib/x86_64-linux-gnu/",
+      work_dir);
+  execute_cmd("/bin/cp /lib64/ld-linux-x86-64.so.2 %s/lib64", work_dir);
+#endif
   execute_cmd("/bin/mkdir -p %s/home/judge", work_dir);
   execute_cmd("/bin/chown judge %s/home/judge", work_dir);
   execute_cmd("/bin/mkdir -p %s/etc", work_dir);
@@ -1824,16 +1996,37 @@ void copy_mono_runtime(char *work_dir) {
 
 void copy_lua_runtime(char *work_dir) {
   copy_shell_runtime(work_dir);
+  execute_cmd("mkdir -p %s/usr/bin", work_dir);
   execute_cmd("/bin/mkdir -p %s/usr/local/lib", work_dir);
   execute_cmd("/bin/mkdir -p %s/usr/local/bin", work_dir);
-  execute_cmd("/bin/cp /usr/bin/lua %s/", work_dir);
+  execute_cmd("/bin/cp /usr/bin/lua %s/usr/bin", work_dir);
 }
 
 void copy_js_runtime(char *work_dir) {
-  //	copy_shell_runtime(work_dir);
-  execute_cmd("/bin/mkdir -p %s/usr/lib /lib/i386-linux-gnu/", work_dir);
+  execute_cmd("mkdir -p %s/usr/bin", work_dir);
+  execute_cmd("mkdir -p %s/dev", work_dir);
+  execute_cmd("/bin/mount -o bind /dev %s/dev", work_dir);
+  execute_cmd("/bin/mount -o remount,ro %s/dev", work_dir);
+  execute_cmd("/bin/mkdir -p %s/usr/lib %s/lib/i386-linux-gnu/ %s/lib64/",
+              work_dir, work_dir, work_dir);
   execute_cmd("/bin/cp /lib/i386-linux-gnu/libz.so.*  %s/lib/i386-linux-gnu/",
               work_dir);
+  execute_cmd(
+      "/bin/cp /usr/lib/i386-linux-gnu/libuv.so.*  %s/lib/i386-linux-gnu/",
+      work_dir);
+  execute_cmd(
+      "/bin/cp /usr/lib/i386-linux-gnu/libicui18n.so.*  %s/lib/i386-linux-gnu/",
+      work_dir);
+  execute_cmd(
+      "/bin/cp /usr/lib/i386-linux-gnu/libicuuc.so.*  %s/lib/i386-linux-gnu/",
+      work_dir);
+  execute_cmd(
+      "/bin/cp /usr/lib/i386-linux-gnu/libicudata.so.*  %s/lib/i386-linux-gnu/",
+      work_dir);
+  execute_cmd(
+      "/bin/cp /lib/i386-linux-gnu/libtinfo.so.*  %s/lib/i386-linux-gnu/",
+      work_dir);
+
   execute_cmd(
       "/bin/cp /usr/lib/i386-linux-gnu/libcares.so.*  %s/lib/i386-linux-gnu/",
       work_dir);
@@ -1860,58 +2053,75 @@ void copy_js_runtime(char *work_dir) {
   execute_cmd(
       "/bin/cp /lib/i386-linux-gnu/libgcc_s.so.1  %s/lib/i386-linux-gnu/",
       work_dir);
-  execute_cmd("/bin/cp /lib/ld-linux.so.*  %s/lib/i386-linux-gnu/", work_dir);
+  execute_cmd("/bin/cp /lib/ld-linux.so.*  %s/lib/", work_dir);
 
-  execute_cmd("/bin/mkdir -p %s/usr/lib /lib/x86_64-linux-gnu/", work_dir);
+#ifdef __x86_64__
   execute_cmd(
-      "/bin/cp /lib/x86_64-linux-gnu/libz.so.*  %s/lib/x86_64-linux-gnu/",
+      "/bin/mkdir -p %s/usr/lib/x86_64-linux-gnu/ %s/lib/x86_64-linux-gnu/",
+      work_dir, work_dir);
+
+  // execute_cmd("/bin/cp /usr/lib/x86_64-linux-gnu/
+  // %s/usr/lib/x86_64-linux-gnu/", work_dir);
+  execute_cmd("/bin/cp /usr/lib/libv8.so.*  %s/usr/lib/", work_dir);
+  execute_cmd(
+      "/bin/cp /usr/lib/x86_64-linux-gnu/libcares.so.* "
+      "%s/usr/lib/x86_64-linux-gnu/",
       work_dir);
   execute_cmd(
-      "/bin/cp /usr/lib/x86_64-linux-gnu/libcares.so.*  "
+      "/bin/cp /lib/x86_64-linux-gnu/libz.so.* %s/lib/x86_64-linux-gnu/",
+      work_dir);
+  execute_cmd(
+      "/bin/cp /usr/lib/x86_64-linux-gnu/libuv.so.* %s/lib/x86_64-linux-gnu/",
+      work_dir);
+  execute_cmd(
+      "/bin/cp /lib/x86_64-linux-gnu/librt.so.* %s/lib/x86_64-linux-gnu/",
+      work_dir);
+  execute_cmd(
+      "/bin/cp /lib/x86_64-linux-gnu/libpthread.so.* %s/lib/x86_64-linux-gnu/",
+      work_dir);
+  execute_cmd(
+      "/bin/cp /lib/x86_64-linux-gnu/libdl.so.* %s/lib/x86_64-linux-gnu/",
+      work_dir);
+  execute_cmd(
+      "/bin/cp /lib/x86_64-linux-gnu/libssl.so.* %s/lib/x86_64-linux-gnu/",
+      work_dir);
+  execute_cmd(
+      "/bin/cp /lib/x86_64-linux-gnu/libcrypto.so.* %s/lib/x86_64-linux-gnu/",
+      work_dir);
+  execute_cmd(
+      "/bin/cp /usr/lib/x86_64-linux-gnu/libicui18n.so.* "
       "%s/lib/x86_64-linux-gnu/",
       work_dir);
-  execute_cmd("/bin/cp /usr/lib/libv8.so.*  %s/lib/x86_64-linux-gnu/",
-              work_dir);
   execute_cmd(
-      "/bin/cp /lib/x86_64-linux-gnu/libssl.so.*  %s/lib/x86_64-linux-gnu/",
-      work_dir);
-  execute_cmd(
-      "/bin/cp /lib/x86_64-linux-gnu/libcrypto.so.*  %s/lib/x86_64-linux-gnu/",
-      work_dir);
-  execute_cmd(
-      "/bin/cp /lib/x86_64-linux-gnu/libdl.so.*  %s/lib/x86_64-linux-gnu/",
-      work_dir);
-  execute_cmd(
-      "/bin/cp /lib/x86_64-linux-gnu/librt.so.*  %s/lib/x86_64-linux-gnu/",
-      work_dir);
-  execute_cmd(
-      "/bin/cp /usr/lib/x86_64-linux-gnu/libstdc++.so.*  "
+      "/bin/cp /usr/lib/x86_64-linux-gnu/libicuuc.so.* "
       "%s/lib/x86_64-linux-gnu/",
       work_dir);
   execute_cmd(
-      "/bin/cp /lib/x86_64-linux-gnu/libpthread.so.*  %s/lib/x86_64-linux-gnu/",
+      "/bin/cp /usr/lib/x86_64-linux-gnu/libstdc++.so.* "
+      "%s/lib/x86_64-linux-gnu/",
       work_dir);
   execute_cmd(
-      "/bin/cp /lib/x86_64-linux-gnu/libc.so.6  %s/lib/x86_64-linux-gnu/",
+      "/bin/cp /lib/x86_64-linux-gnu/libm.so.* %s/lib/x86_64-linux-gnu/",
       work_dir);
   execute_cmd(
-      "/bin/cp /lib/x86_64-linux-gnu/libm.so.6  %s/lib/x86_64-linux-gnu/",
+      "/bin/cp /lib/x86_64-linux-gnu/libgcc_s.so.* %s/lib/x86_64-linux-gnu/",
       work_dir);
   execute_cmd(
-      "/bin/cp /lib/x86_64-linux-gnu/libgcc_s.so.1  %s/lib/x86_64-linux-gnu/",
+      "/bin/cp /lib/x86_64-linux-gnu/libc.so.* %s/lib/x86_64-linux-gnu/",
       work_dir);
-  execute_cmd("/bin/cp /lib64/ld-linux-x86-64.so.2  %s/lib/x86_64-linux-gnu/",
-              work_dir);
-  execute_cmd("/bin/cp /usr/lib/x86_64-linux-gnu/libcares* %s/usr/lib/",
-              work_dir);
-
-  execute_cmd("/bin/cp /usr/bin/nodejs %s/", work_dir);
+  execute_cmd("/bin/cp /lib64/ld-linux-x86-64.so.* %s/lib64/", work_dir);
+  execute_cmd(
+      "/bin/cp /usr/lib/x86_64-linux-gnu/libicudata.so.* "
+      "%s/lib/x86_64-linux-gnu/",
+      work_dir);
+#endif
+  execute_cmd("/bin/cp /usr/bin/nodejs %s/usr/bin", work_dir);
 }
 
 void run_solution(int &lang, char *work_dir, int &time_lmt, int &usedtime,
                   int &mem_lmt) {
   if (nice(19) != 19) {
-    printf("......................renice fail... \n");
+    LOG_ERROR("......................renice fail... \n");
   }
 
   // now the user is "judger"
@@ -1921,9 +2131,9 @@ void run_solution(int &lang, char *work_dir, int &time_lmt, int &usedtime,
   }
 
   // open the files
-  freopen("data.in", "r", stdin);
-  freopen("user.out", "w", stdout);
-  freopen("error.out", "a+", stderr);
+  stdin = freopen("data.in", "r", stdin);
+  stdout = freopen("user.out", "w", stdout);
+  stderr = freopen("error.out", "a+", stderr);
 
   // trace me
   if (use_ptrace) {
@@ -1943,7 +2153,8 @@ void run_solution(int &lang, char *work_dir, int &time_lmt, int &usedtime,
   // child
 
   // set the limit
-  struct rlimit LIM;  // time limit, file limit & memory limit
+  // time limit, file limit & memory limit
+  struct rlimit LIM;
 
   // time limit
   if (oi_mode) {
@@ -1955,7 +2166,7 @@ void run_solution(int &lang, char *work_dir, int &time_lmt, int &usedtime,
   LIM.rlim_max = LIM.rlim_cur;
 
   if (DEBUG) {
-    printf("LIM_CPU=%d", (int)(LIM.rlim_cur));
+    LOG_INFO("LIM_CPU=%d", (int)(LIM.rlim_cur));
   }
 
   setrlimit(RLIMIT_CPU, &LIM);
@@ -1999,7 +2210,8 @@ void run_solution(int &lang, char *work_dir, int &time_lmt, int &usedtime,
   LIM.rlim_cur = STD_MB * mem_lmt / 2 * 3;
   LIM.rlim_max = STD_MB * mem_lmt * 2;
 
-  if (lang < 3) {
+  if (lang < 3 || lang > 19 || lang == 10 || lang == 13 || lang == 14 ||
+      lang == 17) {
     setrlimit(RLIMIT_AS, &LIM);
   }
 
@@ -2058,7 +2270,9 @@ void run_solution(int &lang, char *work_dir, int &time_lmt, int &usedtime,
       break;
   }
 
-  // sleep(1);
+  LOG_ERROR(
+      "Execution error, You need to install compiler VIM or rumtime for your "
+      "languagr");
   fflush(stderr);
   exit(0);
 }
@@ -2070,7 +2284,7 @@ int fix_python_mis_judge(char *work_dir, int &ACflg, int &topmemory,
   comp_res = execute_cmd("/bin/grep 'MemoryError'  %s/error.out", work_dir);
 
   if (!comp_res) {
-    printf("Python need more Memory!");
+    LOG_INFO("Python need more Memory!");
     ACflg = OJ_ML;
     topmemory = mem_lmt * STD_MB;
   }
@@ -2125,8 +2339,9 @@ int fix_java_mis_judge(char *work_dir, int &ACflg, int &topmemory,
 
 int special_judge(char *oj_home, int problem_id, char *infile, char *outfile,
                   char *userfile) {
+  LOG_INFO("pid=%d\n", problem_id);
+
   pid_t pid;
-  printf("pid=%d\n", problem_id);
   pid = fork();
   int ret = 0;
   if (pid == 0) {
@@ -2134,7 +2349,8 @@ int special_judge(char *oj_home, int problem_id, char *infile, char *outfile,
     while (setuid(1536) != 0) sleep(1);
     while (setresuid(1536, 1536, 1536) != 0) sleep(1);
 
-    struct rlimit LIM;  // time limit, file limit& memory limit
+    // time limit, file limit & memory limit
+    struct rlimit LIM;
 
     LIM.rlim_cur = 5;
     LIM.rlim_max = LIM.rlim_cur;
@@ -2149,17 +2365,25 @@ int special_judge(char *oj_home, int problem_id, char *infile, char *outfile,
 
     ret = execute_cmd("%s/data/%d/spj '%s' '%s' %s", oj_home, problem_id,
                       infile, outfile, userfile);
-    if (DEBUG) printf("spj1=%d\n", ret);
-    if (ret)
+
+    if (DEBUG) {
+      LOG_INFO("spj1=%d\n", ret);
+    }
+
+    if (ret) {
       exit(1);
-    else
+    } else {
       exit(0);
+    }
   } else {
     int status;
 
     waitpid(pid, &status, 0);
     ret = WEXITSTATUS(status);
-    if (DEBUG) printf("spj2=%d\n", ret);
+
+    if (DEBUG) {
+      LOG_INFO("spj2=%d\n", ret);
+    }
   }
 
   return ret;
@@ -2173,7 +2397,7 @@ void judge_solution(int &ACflg, int &usedtime, int time_lmt, int isspj,
 
   int comp_res;
 
-  if (!oi_mode) {
+  if (num_of_test == 0) {
     num_of_test = 1.0;
   }
 
@@ -2195,7 +2419,10 @@ void judge_solution(int &ACflg, int &usedtime, int time_lmt, int isspj,
       if (comp_res == 0)
         comp_res = OJ_AC;
       else {
-        if (DEBUG) printf("fail test %s\n", infile);
+        if (DEBUG) {
+          LOG_INFO("fail test %s\n", infile);
+        }
+
         comp_res = OJ_WA;
       }
     } else {
@@ -2206,7 +2433,7 @@ void judge_solution(int &ACflg, int &usedtime, int time_lmt, int isspj,
       ACflg = OJ_WA;
 
       if (DEBUG) {
-        printf("fail test %s\n", infile);
+        LOG_INFO("fail test %s\n", infile);
       }
     } else if (comp_res == OJ_PE) {
       PEflg = OJ_PE;
@@ -2220,7 +2447,7 @@ void judge_solution(int &ACflg, int &usedtime, int time_lmt, int isspj,
     comp_res = fix_java_mis_judge(work_dir, ACflg, topmemory, mem_lmt);
   }
 
-  if (lang == 6) {
+  if (lang == 6 || lang == 18) {
     comp_res = fix_python_mis_judge(work_dir, ACflg, topmemory, mem_lmt);
   }
 }
@@ -2230,11 +2457,12 @@ int get_page_fault_mem(struct rusage &ruse, pid_t &pidApp) {
   int m_vmpeak, m_vmdata, m_minflt;
   m_minflt = ruse.ru_minflt * getpagesize();
 
-  if (0 && DEBUG) {
+  if (DEBUG) {
     m_vmpeak = get_proc_status(pidApp, "VmPeak:");
     m_vmdata = get_proc_status(pidApp, "VmData:");
-    printf("VmPeak:%d KB VmData:%d KB minflt:%d KB\n", m_vmpeak, m_vmdata,
-           m_minflt >> 10);
+
+    LOG_INFO("VmPeak:%d KB VmData:%d KB minflt:%d KB\n", m_vmpeak, m_vmdata,
+             m_minflt >> 10);
   }
 
   return m_minflt;
@@ -2247,11 +2475,11 @@ void print_runtimeerror(char *err) {
 }
 
 void clean_session(pid_t p) {
-  // char cmd[BUFFER_SIZE];
-  const char *pre = "ps awx -o \"\%p \%P\"|grep -w ";
+  const char *pre = "ps awx -o \"\%p \%P\" | grep -w ";
   const char *post = " | awk \'{ print $1  }\'|xargs kill -9";
+
   execute_cmd("%s %d %s", pre, p, post);
-  execute_cmd("ps aux |grep \\^judge|awk '{print $2}'|xargs kill");
+  execute_cmd("ps aux | grep \\^judge|awk '{print $2}'|xargs kill");
 }
 
 void watch_solution(pid_t pidApp, char *infile, int &ACflg, int isspj,
@@ -2262,7 +2490,7 @@ void watch_solution(pid_t pidApp, char *infile, int &ACflg, int isspj,
   int tempmemory;
 
   if (DEBUG) {
-    printf("pid=%d judging %s\n", pidApp, infile);
+    LOG_INFO("pid=%d judging %s\n", pidApp, infile);
   }
 
   int status, sig, exitcode;
@@ -2273,15 +2501,30 @@ void watch_solution(pid_t pidApp, char *infile, int &ACflg, int isspj,
     topmemory = get_proc_status(pidApp, "VmRSS:") << 10;
   }
 
+  bool first = true;
   while (1) {
     // check the usage
 
+    // 等待子进程切换内核态（调用系统 API 或者运行状态变化）
     wait4(pidApp, &status, 0, &ruse);
 
+    if (first) {
+      ptrace(PTRACE_SETOPTIONS, pidApp, NULL,
+             PTRACE_O_TRACESYSGOOD |
+                 PTRACE_O_TRACEEXIT
+                 // 有的发行版带的 PTRACE 不识别以下宏，可以注释掉
+                 | PTRACE_O_EXITKILL | PTRACE_O_TRACECLONE |
+                 PTRACE_O_TRACEFORK | PTRACE_O_TRACEVFORK
+
+      );
+    }
+
     // jvm gc ask VM before need,so used kernel page fault times and page size
-    if (lang == 3 || lang == 7 || lang == 16 || lang == 9 || lang == 17) {
+    if (lang == 3 || lang == 7 || lang == 9 || lang == 13 || lang == 14 ||
+        lang == 16 || lang == 17) {
       tempmemory = get_page_fault_mem(ruse, pidApp);
-    } else {  // other use VmPeak
+    } else {
+      // other use VmPeak
       tempmemory = get_proc_status(pidApp, "VmPeak:") << 10;
     }
 
@@ -2291,7 +2534,7 @@ void watch_solution(pid_t pidApp, char *infile, int &ACflg, int isspj,
 
     if (topmemory > mem_lmt * STD_MB) {
       if (DEBUG) {
-        printf("out of memory %d\n", topmemory);
+        LOG_INFO("out of memory %d\n", topmemory);
       }
 
       if (ACflg == OJ_AC) {
@@ -2302,14 +2545,12 @@ void watch_solution(pid_t pidApp, char *infile, int &ACflg, int isspj,
       break;
     }
 
-    // sig = status >> 8;/*status >> 8
-    // Ã¥Â·Â®Ã¤Â¸ÂÃ¥Â¤Å¡Ã¦ËÂ¯EXITCODE*/
-
     if (WIFEXITED(status)) {
       break;
     }
 
-    if ((lang < 4 || lang == 9 || lang == 6 || lang == 18) &&
+    if ((lang < 4 || lang >= 19 || lang == 13 || lang == 14 || lang == 5 ||
+         lang == 9 || lang == 6 || lang == 18) &&
         get_file_size("error.out") && !oi_mode) {
       ACflg = OJ_RE;
       // addreinfo(solution_id);
@@ -2330,24 +2571,31 @@ void watch_solution(pid_t pidApp, char *infile, int &ACflg, int isspj,
      * to run, exit 17 ok
      */
 
-    if ((lang >= 3 && exitcode == 17) || exitcode == 0x05 || exitcode == 0)
+    if ((lang >= 3 && exitcode == 17) || exitcode == 0x05 || exitcode == 0 ||
+        exitcode == 133)
       // go on and on
       ;
     else {
       if (DEBUG) {
-        printf("status>>8=%d\n", exitcode);
+        LOG_INFO("status>>8=%d\n", exitcode);
+        psignal(exitcode, NULL);
       }
 
-      // psignal(exitcode, NULL);
-
       if (ACflg == OJ_AC) {
+        // 根据退出的原因给出判题结果
         switch (exitcode) {
           case SIGCHLD:
           case SIGALRM:
             alarm(0);
+            if (DEBUG) {
+              LOG_INFO("alarm:%d\n", time_lmt);
+            }
           case SIGKILL:
           case SIGXCPU:
             ACflg = OJ_TL;
+            if (DEBUG) {
+              LOG_INFO("TLE:%d\n", usedtime);
+            }
             break;
           case SIGXFSZ:
             ACflg = OJ_OL;
@@ -2355,25 +2603,28 @@ void watch_solution(pid_t pidApp, char *infile, int &ACflg, int isspj,
           default:
             ACflg = OJ_RE;
         }
+
         print_runtimeerror(strsignal(exitcode));
       }
 
+      // 杀死出问题的进程
       ptrace(PTRACE_KILL, pidApp, NULL, NULL);
-
       break;
     }
 
     if (WIFSIGNALED(status)) {
       /*  WIFSIGNALED: if the process is terminated by signal
-       *
+       *  由外部信号触发的进程终止
        *  psignal(int sig, char *s)，like perror(char *s)，print out s, with
-       * error msg from system of sig sig = 5 means Trace/breakpoint trap sig =
-       * 11 means Segmentation fault sig = 25 means File size limit exceeded
+       *  error msg from system of sig
+       *  sig = 5 means Trace/breakpoint trap
+       *  sig = 11 means Segmentation fault
+       *  sig = 25 means File size limit exceeded
        */
       sig = WTERMSIG(status);
 
       if (DEBUG) {
-        printf("WTERMSIG=%d\n", sig);
+        LOG_INFO("WTERMSIG=%d", sig);
         psignal(sig, NULL);
       }
 
@@ -2382,55 +2633,76 @@ void watch_solution(pid_t pidApp, char *infile, int &ACflg, int isspj,
           case SIGCHLD:
           case SIGALRM:
             alarm(0);
+            if (DEBUG) {
+              LOG_INFO("alarm:%d\n", time_lmt);
+            }
           case SIGKILL:
           case SIGXCPU:
             ACflg = OJ_TL;
+            if (DEBUG) {
+              LOG_INFO("TLE:%d\n", usedtime);
+            }
             break;
           case SIGXFSZ:
             ACflg = OJ_OL;
             break;
-
           default:
             ACflg = OJ_RE;
         }
+
         print_runtimeerror(strsignal(sig));
       }
       break;
     }
 
-    /*     comment from http://www.felix021.com/blog/read.php?1662
-
-     WIFSTOPPED: return true if the process is paused or stopped while ptrace is
-     watching on it WSTOPSIG: get the signal if it was stopped by signal
-     */
+    /*
+      comment from http://www.felix021.com/blog/read.php?1662
+      WIFSTOPPED: return true if the process is paused or stopped while ptrace
+      is watching on it WSTOPSIG: get the signal if it was stopped by signal
+    */
 
     // check the system calls
-    ptrace(PTRACE_GETREGS, pidApp, NULL, &reg);
+    if (!use_ptrace) {
+      ptrace(PTRACE_SYSCALL, pidApp, NULL, NULL);
+      continue;
+    }
 
-    if (call_counter[reg.REG_SYSCALL]) {
-      // call_counter[reg.REG_SYSCALL]--;
-    } else if (record_call) {
-      call_counter[reg.REG_SYSCALL] = 1;
-    } else {  // do not limit JVM syscall for using different JVM
-      ACflg = OJ_RE;
+#ifdef __x86_64__
+    call_id = ptrace(PTRACE_GETREGS, pidApp, NULL, &reg);
+    call_id = ((unsigned int)reg.REG_SYSCALL) % call_array_size;
+#endif
+
+    if (record_call) {
+      LOG_INFO("new call id:%d\n", call_id);
+      call_counter[call_id]++;
+      LOG_INFO("call %d: %d\n", call_id, call_counter[call_id]);
+    } else if (call_counter[call_id]) {
+      call_counter[call_id]--;
+    } else {
+      // do not limit JVM syscall for using different JVM
+      // 对于非法的系统调用，给出具体编号给管理员参考
+
       char error[BUFFER_SIZE];
-      sprintf(error,
-              "[ERROR] A Not allowed system call: runid:%d CALLID:%ld\n"
-              " TO FIX THIS , ask admin to add the CALLID into corresponding "
-              "LANG_XXV[] located at okcalls32/64.h ,\n"
-              "and recompile judge_client. \n"
-              "if you are admin and you don't know what to do ,\n"
-              "chinese explaination can be found on "
-              "https://zhuanlan.zhihu.com/p/24498599\n",
-              solution_id, (long)reg.REG_SYSCALL);
+      sprintf(
+          error,
+          "[ERROR] solution_id:%d called a Forbidden system call:%u [%u]\n"
+          "TO FIX THIS, ask admin to add the CALLID into corresponding \n"
+          "LANG_XXV[] located at okcalls32/64.h and recompile judge_client. \n"
+          "if you are admin and you don't know what to do\n"
+          "中文解释查看知乎 https://zhuanlan.zhihu.com/p/24498599\n",
+          solution_id, call_id, (unsigned int)reg.REG_SYSCALL);
 
       write_log(error);
       print_runtimeerror(error);
       ptrace(PTRACE_KILL, pidApp, NULL, NULL);
     }
 
+    call_id = 0;
+
     ptrace(PTRACE_SYSCALL, pidApp, NULL, NULL);
+    first = false;
   }
+
   usedtime += (ruse.ru_utime.tv_sec * 1000 + ruse.ru_utime.tv_usec / 1000);
   usedtime += (ruse.ru_stime.tv_sec * 1000 + ruse.ru_stime.tv_usec / 1000);
 
@@ -2440,14 +2712,14 @@ void watch_solution(pid_t pidApp, char *infile, int &ACflg, int isspj,
 void clean_workdir(char *work_dir) {
   umount(work_dir);
 
-  if (DEBUG) {
-    execute_cmd("/bin/rm -rf %s/log/*", work_dir);
-    execute_cmd("mkdir %s/log/", work_dir);
-    execute_cmd("/bin/mv %s/* %s/log/", work_dir, work_dir);
-  } else {
-    execute_cmd("mkdir %s/log/", work_dir);
-    execute_cmd("/bin/mv %s/* %s/log/", work_dir, work_dir);
-    execute_cmd("/bin/rm -rf %s/log/*", work_dir);
+  execute_cmd("/bin/rmdir %s/log/* 2>/dev/null", work_dir);
+  execute_cmd("/bin/rm -rf %s/log/* 2>/dev/null", work_dir);
+  execute_cmd("mkdir %s/log/ 2>/dev/null", work_dir);
+  execute_cmd("/bin/mv %s/* %s/log/ 2>/dev/null", work_dir, work_dir);
+
+  if (!DEBUG) {
+    execute_cmd("/bin/rmdir %s/log/* 2>/dev/null", work_dir);
+    execute_cmd("/bin/rm -rf %s/log/* 2>/dev/null", work_dir);
   }
 }
 
@@ -2474,7 +2746,8 @@ void init_parameters(int argc, char **argv, int &solution_id, int &runner_id) {
     strcpy(oj_home, "/home/judge");
   }
 
-  chdir(oj_home);  // change the dir// init our work
+  // change the dir// init our work
+  chdir(oj_home);
 
   solution_id = atoi(argv[1]);
   runner_id = atoi(argv[2]);
@@ -2482,13 +2755,12 @@ void init_parameters(int argc, char **argv, int &solution_id, int &runner_id) {
 
 int get_sim(int solution_id, int lang, int pid, int &sim_s_id) {
   char src_pth[BUFFER_SIZE];
-  // char cmd[BUFFER_SIZE];
   sprintf(src_pth, "Main.%s", lang_ext[lang]);
 
   int sim = execute_cmd("/usr/bin/sim.sh %s %d", src_pth, pid);
 
   if (DEBUG) {
-    printf("sim=%d\n", sim);
+    LOG_INFO("sim=%d\n", sim);
   }
 
   if (!sim) {
@@ -2529,14 +2801,14 @@ int get_sim(int solution_id, int lang, int pid, int &sim_s_id) {
 void mk_shm_workdir(char *work_dir) {
   char shm_path[BUFFER_SIZE];
   sprintf(shm_path, "/dev/shm/hustoj/%s", work_dir);
-  execute_cmd("/bin/mkdir -p %s", shm_path);
-  execute_cmd("/bin/ln -s %s %s/", shm_path, oj_home);
-  execute_cmd("/bin/chown judge %s ", shm_path);
-  execute_cmd("chmod 755 %s ", shm_path);
+  execute_cmd("/bin/mkdir -p %s  2>/dev/null", shm_path);
+  execute_cmd("/bin/ln -s %s %s/  2>/dev/null", shm_path, oj_home);
+  execute_cmd("/bin/chown judge %s  2>/dev/null", shm_path);
+  execute_cmd("chmod 755 %s  2>/dev/null", shm_path);
 
   // sim need a soft link in shm_dir to work correctly
   sprintf(shm_path, "/dev/shm/hustoj/%s/", oj_home);
-  execute_cmd("/bin/ln -s %s/data %s", oj_home, shm_path);
+  execute_cmd("/bin/ln -s %s/data %s  2>/dev/null", oj_home, shm_path);
 }
 
 int count_in_files(char *dirpath) {
@@ -2626,8 +2898,8 @@ int get_test_file(char *work_dir, int p_id) {
 
 void print_call_array() {
   printf("int LANG_%sV[256]={", LANG_NAME);
-  int i = 0;
 
+  int i = 0;
   for (i = 0; i < call_array_size; i++) {
     if (call_counter[i]) {
       printf("%d,", i);
@@ -2648,19 +2920,19 @@ void print_call_array() {
 
 int main(int argc, char **argv) {
   char work_dir[BUFFER_SIZE];
-  // char cmd[BUFFER_SIZE];
   char user_id[BUFFER_SIZE];
+
   int solution_id = 1000;
   int runner_id = 0;
   int p_id, time_lmt, mem_lmt, lang, isspj, sim, sim_s_id, max_case_time = 0;
 
   init_parameters(argc, argv, solution_id, runner_id);
-
   init_mysql_conf();
 
 #ifdef _mysql_h
   if (!http_judge && !init_mysql_conn()) {
-    exit(0);  // exit if mysql is down
+    // exit if mysql is down
+    exit(0);
   }
 #endif
 
@@ -2668,18 +2940,24 @@ int main(int argc, char **argv) {
   sprintf(work_dir, "%s/run%s/", oj_home, argv[2]);
 
   clean_workdir(work_dir);
-  if (shm_run) mk_shm_workdir(work_dir);
+
+  if (shm_run) {
+    mk_shm_workdir(work_dir);
+  }
 
   chdir(work_dir);
 
-  if (http_judge) system("/bin/ln -s ../cookie ./");
+  if (http_judge) {
+    system("/bin/ln -s ../cookie ./");
+  }
+
   get_solution_info(solution_id, p_id, user_id, lang);
 
   if (DEBUG) {
-    printf("lang = %d, lang_name = %s\n", lang, lang_ext[lang]);
+    LOG_INFO("lang = %d, lang_name = %s\n", lang, lang_ext[lang]);
   }
-  // get the limit
 
+  // get the limit
   if (p_id == 0) {
     time_lmt = 5;
     mem_lmt = 128;
@@ -2687,13 +2965,13 @@ int main(int argc, char **argv) {
   } else {
     get_problem_info(p_id, time_lmt, mem_lmt, isspj);
   }
-  // copy source file
 
+  // copy source file
   get_solution(solution_id, work_dir, lang);
 
   // java is lucky
   // Clang Clang++ not VM or Script
-  if (lang >= 3 && lang != 10 && lang != 13 && lang != 14) {
+  if (lang >= 3 && lang <= 17 && lang != 10 && lang != 13 && lang != 14) {
     // the limit for java
     time_lmt = time_lmt + java_time_bonus;
     mem_lmt = mem_lmt + java_memory_bonus;
@@ -2717,16 +2995,17 @@ int main(int argc, char **argv) {
   }
 
   if (DEBUG) {
-    printf("time: %d mem: %d\n", time_lmt, mem_lmt);
+    LOG_INFO("time: %d mem: %d\n", time_lmt, mem_lmt);
   }
 
   // set the result to compiling
   int Compile_OK;
-
   Compile_OK = compile(lang, work_dir);
+
   if (Compile_OK != 0) {
     addceinfo(solution_id);
     update_solution(solution_id, OJ_CE, 0, 0, 0, 0, 0.0);
+
     if (!turbo_mode) update_user(user_id);
     if (!turbo_mode) update_problem(p_id);
 
@@ -2751,7 +3030,9 @@ int main(int argc, char **argv) {
   char infile[BUFFER_SIZE];
   char outfile[BUFFER_SIZE];
   char userfile[BUFFER_SIZE];
-  sprintf(fullpath, "%s/data/%d", oj_home, p_id);  // the fullpath of data dir
+
+  // the fullpath of data dir
+  sprintf(fullpath, "%s/data/%d", oj_home, p_id);
 
   // open DIRs
   DIR *dp;
@@ -2766,7 +3047,9 @@ int main(int argc, char **argv) {
     write_log("No such dir:%s!\n", fullpath);
 
 #ifdef _mysql_h
-    if (!http_judge) mysql_close(conn);
+    if (!http_judge) {
+      mysql_close(conn);
+    }
 #endif
 
     exit(-1);
@@ -2795,13 +3078,14 @@ int main(int argc, char **argv) {
   int num_of_test = 0;
   int finalACflg = ACflg;
 
-  if (p_id == 0) {  // custom input running
+  // custom input running
+  if (p_id == 0) {
     printf("running a custom input...\n");
 
     get_custominput(solution_id, work_dir);
     init_syscalls_limits(lang);
-    pid_t pidApp = fork();
 
+    pid_t pidApp = fork();
     if (pidApp == 0) {
       run_solution(lang, work_dir, time_lmt, usedtime, mem_lmt);
     } else {
@@ -2816,7 +3100,7 @@ int main(int argc, char **argv) {
 
     if (ACflg == OJ_RE) {
       if (DEBUG) {
-        printf("add RE info of %d..... \n", solution_id);
+        LOG_INFO("add RE info of %d..... \n", solution_id);
       }
 
       addreinfo(solution_id);
@@ -2831,10 +3115,9 @@ int main(int argc, char **argv) {
 
   for (; (oi_mode || ACflg == OJ_AC || ACflg == OJ_PE) &&
          (dirp = readdir(dp)) != NULL;) {
-    namelen = isInFile(dirp->d_name);  // check if the file is *.in or not
-
+    // check if the file is *.in or not
+    namelen = isInFile(dirp->d_name);
     if (namelen == 0) continue;
-
     if (http_judge && (!data_list_has(dirp->d_name))) continue;
 
     prepare_files(dirp->d_name, namelen, infile, p_id, work_dir, outfile,
@@ -2842,8 +3125,11 @@ int main(int argc, char **argv) {
 
     init_syscalls_limits(lang);
 
-    pid_t pidApp = fork();
+    if (use_ptrace) {
+      LOG_INFO("USE_PTRACE");
+    }
 
+    pid_t pidApp = fork();
     if (pidApp == 0) {
       run_solution(lang, work_dir, time_lmt, usedtime, mem_lmt);
     } else {
@@ -2883,7 +3169,7 @@ int main(int argc, char **argv) {
   }
 
   if (DEBUG) {
-    printf("sim_enable = %d\n", sim_enable);
+    LOG_INFO("sim_enable = %d\n", sim_enable);
   }
 
   if (sim_enable && ACflg == OJ_AC &&
@@ -2895,7 +3181,7 @@ int main(int argc, char **argv) {
 
   if ((oi_mode && finalACflg == OJ_RE) || ACflg == OJ_RE) {
     if (DEBUG) {
-      printf("add RE info of %d..... \n", solution_id);
+      LOG_INFO("add RE info of %d..... \n", solution_id);
     }
 
     addreinfo(solution_id);
@@ -2920,7 +3206,7 @@ int main(int argc, char **argv) {
 
   if ((oi_mode && finalACflg == OJ_WA) || ACflg == OJ_WA) {
     if (DEBUG) {
-      printf("add diff info of %d..... \n", solution_id);
+      LOG_INFO("add diff info of %d..... \n", solution_id);
     }
 
     if (!isspj) {

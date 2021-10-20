@@ -39,7 +39,7 @@ docker build -t hznuoj-judge:latest -f docker/Dockerfile.judge ./
 ### Start
 
 ```bash
-docker run -it --rm --privileged=true --cap-add=SYS_PTRACE -d \
+docker run -it --privileged=true --cap-add=SYS_PTRACE --net=host -d \
 --name=hznuoj-judge \
 -v /var/hznuoj-judge/judge.conf:/home/judge/etc/judge.conf \
 -v /var/hznuoj-judge/data:/home/judge/data \
@@ -98,5 +98,19 @@ If you want to unmount, you can use the following command:
 
 ```bash
 sudo umount /var/hznuoj-judge/data
+```
+
+## Debug
+
+### Judge
+
+```bash
+judged /home/judge debug
+```
+
+### Judge Client
+
+```bash
+judge_client <solution_id> <run dir id> [oj_home_dir] [debug]
 ```
 
