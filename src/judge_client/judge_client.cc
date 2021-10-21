@@ -1012,9 +1012,9 @@ void update_problem(int pid) {
   }
 }
 
-void umount(char *work_dir) {
+int umount(char *work_dir) {
   if (chdir(work_dir)) {
-    exit(-1);
+    return 1;
   }
 
   UMOUNT("usr");
@@ -1028,11 +1028,12 @@ void umount(char *work_dir) {
   UMOUNT("lib64");
 
   // execute_cmd("/bin/rmdir %s/* ", work_dir);
+
+  return 0;
 }
 
 int compile(int lang, char *work_dir) {
-  // js don't compile
-  if (lang == 16) {
+  if (lang == 5) {
     return 0;
   }
 
@@ -1061,8 +1062,8 @@ int compile(int lang, char *work_dir) {
   const char *CP_P[] = {"fpc", "Main.pas", "-Cs32000000", "-Sh", "-O2",
                         "-Co", "-Ct",      "-Ci",         NULL};
 
-  // const char * CP_J[] = { "javac", "-J-Xms32m",
-  // "-J-Xmx256m","-encoding","UTF-8", "Main.java",NULL };
+  // const char *CP_J[] = {"javac", "-J-Xms32m", "-J-Xmx256m", "-encoding",
+  //                       "UTF-8", "Main.java", NULL};
 
   char javac_buf[7][32];
   char *CP_J[7];
@@ -1120,7 +1121,7 @@ int compile(int lang, char *work_dir) {
 
   const char *CP_LUA[] = {"luac", "-o", "Main", "Main.lua", NULL};
 
-  // const char *CP_JS[] = {"js24", "-c", "Main.js", NULL};
+  const char *CP_JS[] = {"js24", "-c", "Main.js", NULL};
 
   const char *CP_GO[] = {"go", "build", "-o", "Main", "Main.go", NULL};
 
@@ -1269,9 +1270,9 @@ int compile(int lang, char *work_dir) {
       case 15:
         execvp(CP_LUA[0], (char *const *)CP_LUA);
         break;
-      // case 16:
-      //   execvp(CP_JS[0], (char *const *)CP_JS);
-      //   break;
+      case 16:
+        execvp(CP_JS[0], (char *const *)CP_JS);
+        break;
       case 17:
         execvp(CP_GO[0], (char *const *)CP_GO);
         break;
@@ -1667,24 +1668,33 @@ void prepare_files(char *filename, int namelen, char *infile, int &p_id,
   sprintf(userfile, "%s/run%d/user.out", oj_home, runner_id);
 }
 
-void copy_shell_runtime(char *work_dir) {
-  execute_cmd("/bin/mkdir %s/lib", work_dir);
-  execute_cmd("/bin/mkdir %s/lib64", work_dir);
-  execute_cmd("/bin/mkdir %s/bin", work_dir);
+int copy_shell_runtime(char *work_dir) {
+  if (chdir(work_dir)) {
+    LOG_ERROR("chdir %s failure", work_dir);
+    return 1;
+  }
 
-#ifdef __x86_64__
-  execute_cmd("mount -o bind /lib %s/lib", work_dir);
-  execute_cmd("mount -o bind /lib64 %s/lib64", work_dir);
-#endif
+  execute_cmd("mkdir -p tmp usr bin lib lib32 libx32 lib64 etc proc dev");
 
-  //	execute_cmd("/bin/cp /lib32 %s/", work_dir);
-  execute_cmd("/bin/cp /bin/busybox %s/bin/", work_dir);
-  execute_cmd("/bin/ln -s /bin/busybox %s/bin/sh", work_dir);
-  execute_cmd("/bin/cp /bin/bash %s/bin/bash", work_dir);
+  MOUNT_RO("usr");
+  MOUNT_RO("bin");
+  MOUNT_RO("lib");
+  MOUNT_RO("lib32");
+  MOUNT_RO("libx32");
+  MOUNT_RO("lib64");
+  MOUNT_RO("etc");
+  MOUNT_RO("proc");
+  MOUNT_RO("dev");
+
+  return 0;
 }
 
-void copy_objc_runtime(char *work_dir) {
-  copy_shell_runtime(work_dir);
+int copy_objc_runtime(char *work_dir) {
+  int err = copy_shell_runtime(work_dir);
+  if (err) {
+    return err;
+  }
+
   execute_cmd("/bin/mkdir -p %s/proc", work_dir);
   execute_cmd("/bin/mount -o bind /proc %s/proc", work_dir);
   execute_cmd("/bin/mkdir -p %s/lib/", work_dir);
@@ -1751,10 +1761,16 @@ void copy_objc_runtime(char *work_dir) {
   execute_cmd(
       "/bin/cp -aL /usr/lib/libxslt.so.1                        %s/lib/ ",
       work_dir);
+
+  return 0;
 }
 
-void copy_bash_runtime(char *work_dir) {
-  copy_shell_runtime(work_dir);
+int copy_bash_runtime(char *work_dir) {
+  int err = copy_shell_runtime(work_dir);
+  if (err) {
+    return err;
+  }
+
   execute_cmd("/bin/cp `which bc`  %s/bin/", work_dir);
   execute_cmd("busybox dos2unix Main.sh", work_dir);
   execute_cmd("/bin/ln -s /bin/busybox %s/bin/grep", work_dir);
@@ -1772,10 +1788,16 @@ void copy_bash_runtime(char *work_dir) {
   execute_cmd("/bin/ln -s /bin/busybox %s/bin/head", work_dir);
   execute_cmd("/bin/ln -s /bin/busybox %s/bin/xargs", work_dir);
   execute_cmd("chmod +rx %s/Main.sh", work_dir);
+
+  return 0;
 }
 
-void copy_ruby_runtime(char *work_dir) {
-  copy_shell_runtime(work_dir);
+int copy_ruby_runtime(char *work_dir) {
+  int err = copy_shell_runtime(work_dir);
+  if (err) {
+    return err;
+  }
+
   execute_cmd("mkdir -p %s/usr/bin", work_dir);
   execute_cmd("mkdir -p %s/usr/lib", work_dir);
   execute_cmd("mkdir -p %s/usr/lib64", work_dir);
@@ -1791,10 +1813,16 @@ void copy_ruby_runtime(char *work_dir) {
   execute_cmd("/bin/cp -a /usr/lib/x86_64-linux-gnu/libgmp* %s/usr/lib/",
               work_dir);
 #endif
+
+  return 0;
 }
 
-void copy_guile_runtime(char *work_dir) {
-  copy_shell_runtime(work_dir);
+int copy_guile_runtime(char *work_dir) {
+  int err = copy_shell_runtime(work_dir);
+  if (err) {
+    return err;
+  }
+
   execute_cmd("/bin/mkdir -p %s/proc", work_dir);
   execute_cmd("/bin/mount -o bind /proc %s/proc", work_dir);
   execute_cmd("/bin/mkdir -p %s/usr/bin", work_dir);
@@ -1822,10 +1850,16 @@ void copy_guile_runtime(char *work_dir) {
   execute_cmd("/bin/cp -a /usr/lib/x86_64-linux-gnu/libunistring* %s/usr/lib/",
               work_dir);
 #endif
+
+  return 0;
 }
 
-void copy_python_runtime(char *work_dir) {
-  copy_shell_runtime(work_dir);
+int copy_python_runtime(char *work_dir) {
+  int err = copy_shell_runtime(work_dir);
+  if (err) {
+    return err;
+  }
+
   execute_cmd("mkdir -p %s/usr/include", work_dir);
   execute_cmd("mkdir -p %s/dev", work_dir);
   execute_cmd("mkdir -p %s/usr/lib", work_dir);
@@ -1842,10 +1876,16 @@ void copy_python_runtime(char *work_dir) {
   execute_cmd("/bin/mkdir -p %s/etc", work_dir);
   execute_cmd("/bin/grep judge /etc/passwd>%s/etc/passwd", work_dir);
   execute_cmd("/bin/mount -o bind /dev %s/dev", work_dir);
+
+  return 0;
 }
 
-void copy_php_runtime(char *work_dir) {
-  copy_shell_runtime(work_dir);
+int copy_php_runtime(char *work_dir) {
+  int err = copy_shell_runtime(work_dir);
+  if (err) {
+    return err;
+  }
+
   execute_cmd("/bin/mkdir -p %s/usr/bin", work_dir);
   execute_cmd("/bin/mkdir %s/usr/lib", work_dir);
   execute_cmd("/bin/cp /usr/lib/libedit* %s/usr/lib/", work_dir);
@@ -1875,27 +1915,45 @@ void copy_php_runtime(char *work_dir) {
 #endif
   execute_cmd("/bin/cp /usr/bin/php* %s/usr/bin", work_dir);
   execute_cmd("chmod +rx %s/Main.php", work_dir);
+
+  return 0;
 }
 
-void copy_perl_runtime(char *work_dir) {
-  copy_shell_runtime(work_dir);
+int copy_perl_runtime(char *work_dir) {
+  int err = copy_shell_runtime(work_dir);
+  if (err) {
+    return err;
+  }
+
   execute_cmd("/bin/mkdir %s/usr", work_dir);
   execute_cmd("/bin/mkdir %s/usr/lib", work_dir);
   execute_cmd("/bin/cp /usr/lib/libperl* %s/usr/lib/", work_dir);
   execute_cmd("/bin/cp /usr/bin/perl* %s/", work_dir);
+
+  return 0;
 }
 
-void copy_freebasic_runtime(char *work_dir) {
-  copy_shell_runtime(work_dir);
+int copy_freebasic_runtime(char *work_dir) {
+  int err = copy_shell_runtime(work_dir);
+  if (err) {
+    return err;
+  }
+
   execute_cmd("/bin/mkdir -p %s/usr/local/lib", work_dir);
   execute_cmd("/bin/mkdir -p %s/usr/local/bin", work_dir);
   execute_cmd("/bin/cp /usr/local/lib/freebasic %s/usr/local/lib/", work_dir);
   execute_cmd("/bin/cp /usr/local/bin/fbc %s/", work_dir);
   execute_cmd("/bin/cp -a /lib32/* %s/lib/", work_dir);
+
+  return 0;
 }
 
-void copy_mono_runtime(char *work_dir) {
-  copy_shell_runtime(work_dir);
+int copy_mono_runtime(char *work_dir) {
+  int err = copy_shell_runtime(work_dir);
+  if (err) {
+    return err;
+  }
+
   execute_cmd("/bin/mkdir -p %s/usr/bin", work_dir);
   execute_cmd("/bin/mkdir %s/proc", work_dir);
   execute_cmd("/bin/mkdir -p %s/usr/lib/mono/2.0", work_dir);
@@ -1943,17 +2001,25 @@ void copy_mono_runtime(char *work_dir) {
   execute_cmd("/bin/chown judge %s/home/judge", work_dir);
   execute_cmd("/bin/mkdir -p %s/etc", work_dir);
   execute_cmd("/bin/grep judge /etc/passwd>%s/etc/passwd", work_dir);
+
+  return 0;
 }
 
-void copy_lua_runtime(char *work_dir) {
-  copy_shell_runtime(work_dir);
+int copy_lua_runtime(char *work_dir) {
+  int err = copy_shell_runtime(work_dir);
+  if (err) {
+    return err;
+  }
+
   execute_cmd("mkdir -p %s/usr/bin", work_dir);
   execute_cmd("/bin/mkdir -p %s/usr/local/lib", work_dir);
   execute_cmd("/bin/mkdir -p %s/usr/local/bin", work_dir);
   execute_cmd("/bin/cp /usr/bin/lua %s/usr/bin", work_dir);
+
+  return 0;
 }
 
-void copy_js_runtime(char *work_dir) {
+int copy_js_runtime(char *work_dir) {
   execute_cmd("mkdir -p %s/usr/bin", work_dir);
   execute_cmd("mkdir -p %s/dev", work_dir);
   execute_cmd("/bin/mount -o bind /dev %s/dev", work_dir);
@@ -2067,6 +2133,8 @@ void copy_js_runtime(char *work_dir) {
       work_dir);
 #endif
   execute_cmd("/bin/cp /usr/bin/nodejs %s/usr/bin", work_dir);
+
+  return 0;
 }
 
 void run_solution(int &lang, char *work_dir, int &time_lmt, int &usedtime,
@@ -2204,28 +2272,31 @@ void run_solution(int &lang, char *work_dir, int &time_lmt, int &usedtime,
       execle("/ruby", "/ruby", "Main.rb", (char *)NULL, envp);
       break;
     case 5:  // bash
-      execle("/bin/bash", "/bin/bash", "Main.sh", (char *)NULL, envp);
+      execl("/usr/bin/bash", "/usr/bin/bash", "Main.sh", (char *)NULL);
       break;
     case 6:  // Python2
-      execle("/python2", "/python2", "Main.py", (char *)NULL, envp);
+      execle("/usr/bin/python2.7", "/usr/bin/python2.7", "Main.py",
+             (char *)NULL, envp);
       break;
     case 18:  // Python3
-      execle("/python3", "/python3", "Main.py", (char *)NULL, envp);
+      execle("/usr/bin/python3.9", "/usr/bin/python3.9", "Main.py",
+             (char *)NULL, envp);
       break;
     case 7:  // php
-      execle("/php", "/php", "Main.php", (char *)NULL, envp);
+      execle("/usr/bin/php", "/usr/bin/php", "Main.php", (char *)NULL, envp);
       break;
     case 8:  // perl
-      execle("/perl", "/perl", "Main.pl", (char *)NULL, envp);
+      execle("/usr/bin/perl", "/usr/bin/perl", "Main.pl", (char *)NULL, envp);
       break;
     case 9:  // Mono C#
-      execle("/mono", "/mono", "--debug", "Main.exe", (char *)NULL, envp);
+      execle("/usr/bin/mono", "/usr/bin/mono", "--debug", "Main.exe",
+             (char *)NULL, envp);
       break;
     case 12:  // guile
       execle("/guile", "/guile", "Main.scm", (char *)NULL, envp);
       break;
     case 15:  // lua
-      execle("/lua", "/lua", "Main", (char *)NULL, envp);
+      execle("/usr/bin/lua", "/usr/bin/lua", "Main", (char *)NULL, envp);
       break;
     case 16:  // Node.js
       execle("/nodejs", "/nodejs", "Main.js", (char *)NULL, envp);
@@ -2417,10 +2488,11 @@ void judge_solution(int &ACflg, int &usedtime, int time_lmt, int isspj,
 
 int get_page_fault_mem(struct rusage &ruse, pid_t &pidApp) {
   // java use pagefault
-  int m_vmpeak, m_vmdata, m_minflt;
+  int m_minflt;
   m_minflt = ruse.ru_minflt * getpagesize();
 
   //   if (DEBUG) {
+  //     int m_vmpeak, m_vmdata;
   //     m_vmpeak = get_proc_status(pidApp, "VmPeak:");
   //     m_vmdata = get_proc_status(pidApp, "VmData:");
 
@@ -2646,7 +2718,7 @@ void watch_solution(pid_t pidApp, char *infile, int &ACflg, int isspj,
 
       char error[BUFFER_SIZE];
       sprintf(error,
-              "[ERROR] A Not allowed system call: runid:%d CALLID:%ld\n"
+              "[ERROR] A Not allowed system call: runid:%d CALLID:%u [%u]\n"
               " TO FIX THIS , ask admin to add the CALLID into corresponding "
               "LANG_XXV[] located at okcalls32/64.h ,\n"
               "and recompile judge_client. \n"
@@ -3026,17 +3098,23 @@ int main(int argc, char **argv) {
   int usedtime = 0, topmemory = 0;
 
   // create chroot for ruby bash python
-  if (lang == 4) copy_ruby_runtime(work_dir);
-  if (lang == 5) copy_bash_runtime(work_dir);
-  if (lang == 6 || lang == 18) copy_python_runtime(work_dir);
-  if (lang == 7) copy_php_runtime(work_dir);
-  if (lang == 8) copy_perl_runtime(work_dir);
-  if (lang == 9) copy_mono_runtime(work_dir);
-  if (lang == 10) copy_objc_runtime(work_dir);
-  if (lang == 11) copy_freebasic_runtime(work_dir);
-  if (lang == 12) copy_guile_runtime(work_dir);
-  if (lang == 15) copy_lua_runtime(work_dir);
-  if (lang == 16) copy_js_runtime(work_dir);
+  // if (lang == 4) copy_ruby_runtime(work_dir);
+  // if (lang == 5) copy_bash_runtime(work_dir);
+  // if (lang == 6 || lang == 18) copy_python_runtime(work_dir);
+  // if (lang == 7) copy_php_runtime(work_dir);
+  // if (lang == 8) copy_perl_runtime(work_dir);
+  // if (lang == 9) copy_mono_runtime(work_dir);
+  // if (lang == 10) copy_objc_runtime(work_dir);
+  // if (lang == 11) copy_freebasic_runtime(work_dir);
+  // if (lang == 12) copy_guile_runtime(work_dir);
+  // if (lang == 15) copy_lua_runtime(work_dir);
+  // if (lang == 16) copy_js_runtime(work_dir);
+
+  if ((lang >= 4 && lang <= 12) || lang == 15 || lang == 16 || lang == 18) {
+    if (copy_shell_runtime(work_dir)) {
+      ACflg = OJ_CE;
+    }
+  }
 
   // read files and run
   double pass_rate = 0.0;

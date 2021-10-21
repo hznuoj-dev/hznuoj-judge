@@ -168,6 +168,7 @@ int LANG_RV[CALL_ARRAY_SIZE] = {0,
                                 0};
 // bash
 int LANG_BV[CALL_ARRAY_SIZE] = {0,
+                                257,
                                 SYS_write,
                                 SYS_mprotect,
                                 SYS_getuid,
@@ -379,6 +380,8 @@ int LANG_PHV[CALL_ARRAY_SIZE] = {0,
                                  0};
 // perl
 int LANG_PLV[CALL_ARRAY_SIZE] = {0,
+                                 257,
+                                 302,
                                  SYS_write,
                                  SYS_mprotect,
                                  SYS_getuid,
@@ -418,6 +421,7 @@ int LANG_PLV[CALL_ARRAY_SIZE] = {0,
                                  0};
 // c-sharp
 int LANG_CSV[CALL_ARRAY_SIZE] = {0,
+                                 99,
                                  SYS_write,
                                  SYS_mprotect,
                                  SYS_getuid,
@@ -625,6 +629,8 @@ int LANG_SV[CALL_ARRAY_SIZE] = {0,
                                 0};
 // lua
 int LANG_LUAV[CALL_ARRAY_SIZE] = {0,
+                                  8,
+                                  257,
                                   SYS_write,
                                   SYS_mprotect,
                                   SYS_munmap,

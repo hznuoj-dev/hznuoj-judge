@@ -4,7 +4,7 @@ set -ex
 
 INSTALL_JUDGE_SH_TOP_DIR="$(dirname "$(realpath "${BASH_SOURCE[0]}")")"
 
-apt-get install -y net-tools gawk
+apt-get install -y net-tools gawk dos2unix
 apt-get clean
 
 # compile and install the core
