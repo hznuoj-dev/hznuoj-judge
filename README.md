@@ -39,7 +39,7 @@ docker build -t hznuoj-judge:latest -f docker/Dockerfile.judge ./
 ### Start
 
 ```bash
-docker run -it --privileged=true --cap-add=SYS_PTRACE -d \
+docker run -it --privileged=true --cap-add=SYS_PTRACE --shm-size="1g" -d \
 --name=hznuoj-judge \
 -v /var/hznuoj-judge/judge.conf:/home/judge/etc/judge.conf \
 -v /var/hznuoj-judge/data:/home/judge/data \
