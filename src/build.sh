@@ -12,11 +12,9 @@ cd "${BUILD_SH_TOP_DIR}/judge_client" || exit 1
 make
 chmod +x judge_client
 
-cd "${BUILD_SH_TOP_DIR}/sim/sim_2_77" || exit 1
+cd "${BUILD_SH_TOP_DIR}/sim/sim_3_0_2" || exit 1
 
-rm ./*.o
-rm ./*.exe
-
+make fresh
 make exes
 
 chmod +x sim_*.exe

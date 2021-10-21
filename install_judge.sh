@@ -4,6 +4,8 @@ set -ex
 
 INSTALL_JUDGE_SH_TOP_DIR="$(dirname "$(realpath "${BASH_SOURCE[0]}")")"
 
+# for sim
+apt-get install -y flex
 apt-get install -y net-tools gawk dos2unix
 apt-get clean
 
@@ -11,23 +13,17 @@ apt-get clean
 cd "${INSTALL_JUDGE_SH_TOP_DIR}/src" || exit 1
 bash build.sh
 
+SIM_VERSION=3_0_2
 cp "${INSTALL_JUDGE_SH_TOP_DIR}"/src/judged/judged /usr/bin
 cp "${INSTALL_JUDGE_SH_TOP_DIR}"/src/judge_client/judge_client /usr/bin
-cp "${INSTALL_JUDGE_SH_TOP_DIR}"/src/sim/sim_2_77/sim_c.exe /usr/bin/sim_c
-cp "${INSTALL_JUDGE_SH_TOP_DIR}"/src/sim/sim_2_77/sim_java.exe /usr/bin/sim_java
-cp "${INSTALL_JUDGE_SH_TOP_DIR}"/src/sim/sim_2_77/sim_pasc.exe /usr/bin/sim_pas
-cp "${INSTALL_JUDGE_SH_TOP_DIR}"/src/sim/sim_2_77/sim_text.exe /usr/bin/sim_text
-cp "${INSTALL_JUDGE_SH_TOP_DIR}"/src/sim/sim_2_77/sim_lisp.exe /usr/bin/sim_scm
+cp "${INSTALL_JUDGE_SH_TOP_DIR}"/src/sim/sim_${SIM_VERSION}/sim_c.exe /usr/bin/sim_c
+cp "${INSTALL_JUDGE_SH_TOP_DIR}"/src/sim/sim_${SIM_VERSION}/sim_c++.exe /usr/bin/sim_cc
+cp "${INSTALL_JUDGE_SH_TOP_DIR}"/src/sim/sim_${SIM_VERSION}/sim_java.exe /usr/bin/sim_java
+cp "${INSTALL_JUDGE_SH_TOP_DIR}"/src/sim/sim_${SIM_VERSION}/sim_pasc.exe /usr/bin/sim_pas
+cp "${INSTALL_JUDGE_SH_TOP_DIR}"/src/sim/sim_${SIM_VERSION}/sim_text.exe /usr/bin/sim_text
+cp "${INSTALL_JUDGE_SH_TOP_DIR}"/src/sim/sim_${SIM_VERSION}/sim_lisp.exe /usr/bin/sim_scm
 cp "${INSTALL_JUDGE_SH_TOP_DIR}"/src/sim/sim.sh /usr/bin
 chmod +x /usr/bin/sim.sh
-
-for sim_x in /usr/bin/sim_cc /usr/bin/sim_rb /usr/bin/sim_sh; do
-  if [[ -x "${sim_x}" ]]; then
-    rm "${sim_x}"
-  fi
-done
-
-ln -s /usr/bin/sim_c /usr/bin/sim_cc
 
 # create user and homedir
 /usr/sbin/useradd -m -u 1536 judge
