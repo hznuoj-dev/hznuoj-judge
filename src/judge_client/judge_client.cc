@@ -1031,8 +1031,8 @@ void umount(char *work_dir) {
 }
 
 int compile(int lang, char *work_dir) {
-  // python/js don't compile
-  if (lang == 6 || lang == 16 || lang == 18) {
+  // js don't compile
+  if (lang == 16) {
     return 0;
   }
 
@@ -1083,9 +1083,9 @@ int compile(int lang, char *work_dir) {
 
   const char *CP_B[] = {"chmod", "+rx", "Main.sh", NULL};
 
-  const char *CP_Y2[] = {"python2", "-m", "py_compile", "Main.py", NULL};
+  const char *CP_Y2[] = {"python2.7", "-m", "py_compile", "Main.py", NULL};
 
-  const char *CP_Y3[] = {"python3", "-m", "py_compile", "Main.py", NULL};
+  const char *CP_Y3[] = {"python3.9", "-m", "py_compile", "Main.py", NULL};
 
   const char *CP_PH[] = {"php", "-l", "Main.php", NULL};
 
@@ -1139,14 +1139,21 @@ int compile(int lang, char *work_dir) {
   int pid = fork();
   if (pid == 0) {
     struct rlimit LIM;
-    LIM.rlim_max = 6;
-    LIM.rlim_cur = 6;
+
+    int cpu = 50;
+    if (lang == 3) {
+      cpu = 60;
+    }
+
+    LIM.rlim_max = cpu;
+    LIM.rlim_cur = cpu;
     setrlimit(RLIMIT_CPU, &LIM);
 
-    alarm(6);
+    alarm(0);
+    alarm(cpu);
 
-    LIM.rlim_max = 10 * STD_MB;
-    LIM.rlim_cur = 10 * STD_MB;
+    LIM.rlim_max = 500 * STD_MB;
+    LIM.rlim_cur = 500 * STD_MB;
     setrlimit(RLIMIT_FSIZE, &LIM);
 
     if (lang == 2 || lang == 3 || lang == 17) {
@@ -1156,7 +1163,10 @@ int compile(int lang, char *work_dir) {
       LIM.rlim_max = STD_MB * 256;
       LIM.rlim_cur = STD_MB * 256;
     }
-    setrlimit(RLIMIT_AS, &LIM);
+
+    if (lang != 3) {
+      setrlimit(RLIMIT_AS, &LIM);
+    }
 
     if (lang != 2 && lang != 11) {
       stderr = freopen("ce.txt", "w", stderr);
@@ -1168,8 +1178,8 @@ int compile(int lang, char *work_dir) {
     execute_cmd("/bin/chown judge %s ", work_dir);
     execute_cmd("/bin/chmod 750 %s ", work_dir);
 
-    if (compile_chroot && lang != 3 && lang != 9 && lang != 6 && lang != 11 &&
-        lang != 5) {
+    if (compile_chroot && lang != 3 && lang != 9 && lang != 6 && lang != 18 &&
+        lang != 11 && lang != 5) {
       if (DEBUG) {
         LOG_INFO("start mount compile file");
       }
@@ -1662,65 +1672,6 @@ void copy_shell_runtime(char *work_dir) {
   execute_cmd("/bin/mkdir %s/lib64", work_dir);
   execute_cmd("/bin/mkdir %s/bin", work_dir);
 
-#ifdef __mips__
-  execute_cmd(
-      "/bin/cp -a /lib/mips64el-linux-gnuabi64/  "
-      "%s/lib/mips64el-linux-gnuabi64",
-      work_dir);
-  execute_cmd("mkdir -p %s/lib/mips64el-linux-gnuabi64/", work_dir);
-  execute_cmd("/bin/cp -a /lib64/ld.so.1  %s/lib64/", work_dir);
-  execute_cmd(
-      "/bin/cp -a /lib/mips64el-linux-gnuabi64/libdl.so.2  "
-      "%s/lib/mips64el-linux-gnuabi64",
-      work_dir);
-  execute_cmd(
-      "/bin/cp -a /lib/mips64el-linux-gnuabi64/libutil.so.1  "
-      "%s/lib/mips64el-linux-gnuabi64",
-      work_dir);
-  execute_cmd(
-      "/bin/cp -a /lib/mips64el-linux-gnuabi64/libz.so.1  "
-      "%s/lib/mips64el-linux-gnuabi64",
-      work_dir);
-  execute_cmd(
-      "/bin/cp -a /lib/mips64el-linux-gnuabi64/libm.so.6  "
-      "%s/lib/mips64el-linux-gnuabi64",
-      work_dir);
-  execute_cmd(
-      "/bin/cp -a /lib/mips64el-linux-gnuabi64/libc.so.6  "
-      "%s/lib/mips64el-linux-gnuabi64",
-      work_dir);
-  execute_cmd(
-      "/bin/cp -a /lib/mips64el-linux-gnuabi64/libtinfo.so.5  "
-      "%s/lib/mips64el-linux-gnuabi64",
-      work_dir);
-  execute_cmd(
-      "/bin/cp -a /lib/mips64el-linux-gnuabi64/ld-2.24.so  "
-      "%s/lib/mips64el-linux-gnuabi64",
-      work_dir);
-  execute_cmd(
-      "/bin/cp -a /lib/mips64el-linux-gnuabi64/libc-2.24.so  "
-      "%s/lib/mips64el-linux-gnuabi64",
-      work_dir);
-  execute_cmd("/bin/cp -a /lib64/libc.so.6 %s/lib64/", work_dir);
-  execute_cmd("/bin/cp -a /lib64/libtinfo.so.6  %s/lib64/", work_dir);
-  execute_cmd("/bin/cp -a /lib64/ld-2.27.so  %s/lib64/", work_dir);
-  execute_cmd("/bin/cp -a /lib64/libc-2.27.so %s/lib64/", work_dir);
-  execute_cmd("/bin/cp -a /lib64/libdl-2.27.so %s/lib64/", work_dir);
-  execute_cmd("/bin/cp -a /lib64/libtinfo.so.6.1 %s/lib64/", work_dir);
-  execute_cmd(
-      "cp  /lib/mips64el-linux-gnuabi64/libpthread.so.0 "
-      "%s/lib/mips64el-linux-gnuabi64/",
-      work_dir);
-  execute_cmd("/bin/cp -a /bin/bash %s/bin/", work_dir);
-
-#endif
-
-#ifdef __i386
-  execute_cmd("/bin/cp /lib/ld-linux* %s/lib/", work_dir);
-  execute_cmd("/bin/cp -a /lib/i386-linux-gnu/  %s/lib/", work_dir);
-//	execute_cmd("/bin/cp -a /usr/lib/i386-linux-gnu %s/lib/", work_dir);
-#endif
-
 #ifdef __x86_64__
   execute_cmd("mount -o bind /lib %s/lib", work_dir);
   execute_cmd("mount -o bind /lib64 %s/lib64", work_dir);
@@ -2120,6 +2071,11 @@ void copy_js_runtime(char *work_dir) {
 
 void run_solution(int &lang, char *work_dir, int &time_lmt, int &usedtime,
                   int &mem_lmt) {
+  char *const envp[] = {(char *const)"PYTHONIOENCODING=utf-8",
+                        (char *const)"LANG=zh_CN.UTF-8",
+                        (char *const)"LANGUAGE=zh_CN.UTF-8",
+                        (char *const)"LC_ALL=zh_CN.utf-8", NULL};
+
   if (nice(19) != 19) {
     LOG_ERROR("......................renice fail... \n");
   }
@@ -2130,10 +2086,15 @@ void run_solution(int &lang, char *work_dir, int &time_lmt, int &usedtime,
     exit(-4);
   }
 
+  execute_cmd("touch %s/user.out", work_dir);
+  execute_cmd("chgrp judge %s/user.out %s/data.in", work_dir, work_dir);
+  execute_cmd("chmod 740 %s/data.in", work_dir);
+  execute_cmd("chmod 760 %s/user.out", work_dir);
+
   // open the files
-  stdin = freopen("data.in", "r", stdin);
-  stdout = freopen("user.out", "w", stdout);
-  stderr = freopen("error.out", "a+", stderr);
+  freopen("data.in", "r", stdin);
+  freopen("user.out", "w", stdout);
+  freopen("error.out", "a+", stderr);
 
   // trace me
   if (use_ptrace) {
@@ -2152,7 +2113,6 @@ void run_solution(int &lang, char *work_dir, int &time_lmt, int &usedtime,
   // char java_p1[BUFFER_SIZE], java_p2[BUFFER_SIZE];
   // child
 
-  // set the limit
   // time limit, file limit & memory limit
   struct rlimit LIM;
 
@@ -2160,7 +2120,7 @@ void run_solution(int &lang, char *work_dir, int &time_lmt, int &usedtime,
   if (oi_mode) {
     LIM.rlim_cur = time_lmt + 1;
   } else {
-    LIM.rlim_cur = (time_lmt - usedtime / 1000) + 1;
+    LIM.rlim_cur = (time_lmt - usedtime / 1000.0f) + 1;
   }
 
   LIM.rlim_max = LIM.rlim_cur;
@@ -2181,16 +2141,16 @@ void run_solution(int &lang, char *work_dir, int &time_lmt, int &usedtime,
   // proc limit
   switch (lang) {
     case 17:
-      LIM.rlim_cur = LIM.rlim_max = 280;
-      break;
-    case 3:  // java
-    case 4:  // ruby
-    // case 6:  //python2
-    // case 18: //python3
     case 9:  // C#
+    case 3:  // java
+      LIM.rlim_cur = LIM.rlim_max = 880;
+      break;
+    case 4:   // ruby
+    case 6:   // python2
+    case 18:  // python3
     case 12:
     case 16:
-      LIM.rlim_cur = LIM.rlim_max = 80;
+      LIM.rlim_cur = LIM.rlim_max = 200;
       break;
     case 5:  // bash
       LIM.rlim_cur = LIM.rlim_max = 3;
@@ -2202,15 +2162,15 @@ void run_solution(int &lang, char *work_dir, int &time_lmt, int &usedtime,
   setrlimit(RLIMIT_NPROC, &LIM);
 
   // set the stack
-  LIM.rlim_cur = STD_MB << 6;
-  LIM.rlim_max = STD_MB << 6;
+  LIM.rlim_cur = STD_MB << 8;
+  LIM.rlim_max = STD_MB << 8;
   setrlimit(RLIMIT_STACK, &LIM);
 
   // set the memory
   LIM.rlim_cur = STD_MB * mem_lmt / 2 * 3;
   LIM.rlim_max = STD_MB * mem_lmt * 2;
 
-  if (lang < 3 || lang > 19 || lang == 10 || lang == 13 || lang == 14 ||
+  if (lang < 3 || lang >= 19 || lang == 10 || lang == 13 || lang == 14 ||
       lang == 17) {
     setrlimit(RLIMIT_AS, &LIM);
   }
@@ -2227,52 +2187,53 @@ void run_solution(int &lang, char *work_dir, int &time_lmt, int &usedtime,
     case 19:
     case 20:
     case 21:
-      execl("./Main", "./Main", (char *)NULL);
+      execle("./Main", "./Main", (char *)NULL, envp);
       break;
     case 3:
       sprintf(java_xms, "-Xmx%dM", mem_lmt);
       // sprintf(java_xmx, "-XX:MaxPermSize=%dM", mem_lmt);
 
-      execl("/usr/bin/java", "/usr/bin/java", java_xms, java_xmx,
-            "-Djava.security.manager", "-Djava.security.policy=./java.policy",
-            "Main", (char *)NULL);
+      execle("/usr/bin/java", "/usr/bin/java", java_xms, java_xmx,
+             "-Djava.security.manager", "-Djava.security.policy=./java.policy",
+             "Main", (char *)NULL, envp);
       break;
     case 4:
       // system("/ruby Main.rb<data.in");
-      execl("/ruby", "/ruby", "Main.rb", (char *)NULL);
+      execle("/ruby", "/ruby", "Main.rb", (char *)NULL, envp);
       break;
     case 5:  // bash
-      execl("/bin/bash", "/bin/bash", "Main.sh", (char *)NULL);
+      execle("/bin/bash", "/bin/bash", "Main.sh", (char *)NULL, envp);
       break;
     case 6:  // Python2
-      execl("/python2", "/python2", "Main.py", (char *)NULL);
+      execle("/python2", "/python2", "Main.py", (char *)NULL, envp);
       break;
     case 18:  // Python3
-      execl("/python3", "/python3", "Main.py", (char *)NULL);
+      execle("/python3", "/python3", "Main.py", (char *)NULL, envp);
       break;
     case 7:  // php
-      execl("/php", "/php", "Main.php", (char *)NULL);
+      execle("/php", "/php", "Main.php", (char *)NULL, envp);
       break;
     case 8:  // perl
-      execl("/perl", "/perl", "Main.pl", (char *)NULL);
+      execle("/perl", "/perl", "Main.pl", (char *)NULL, envp);
       break;
     case 9:  // Mono C#
-      execl("/mono", "/mono", "--debug", "Main.exe", (char *)NULL);
+      execle("/mono", "/mono", "--debug", "Main.exe", (char *)NULL, envp);
       break;
     case 12:  // guile
-      execl("/guile", "/guile", "Main.scm", (char *)NULL);
+      execle("/guile", "/guile", "Main.scm", (char *)NULL, envp);
       break;
     case 15:  // lua
-      execl("/lua", "/lua", "Main", (char *)NULL);
+      execle("/lua", "/lua", "Main", (char *)NULL, envp);
       break;
     case 16:  // Node.js
-      execl("/nodejs", "/nodejs", "Main.js", (char *)NULL);
+      execle("/nodejs", "/nodejs", "Main.js", (char *)NULL, envp);
       break;
   }
 
   LOG_ERROR(
       "Execution error, You need to install compiler VIM or rumtime for your "
       "languagr");
+
   fflush(stderr);
   exit(0);
 }
@@ -2457,13 +2418,14 @@ int get_page_fault_mem(struct rusage &ruse, pid_t &pidApp) {
   int m_vmpeak, m_vmdata, m_minflt;
   m_minflt = ruse.ru_minflt * getpagesize();
 
-  if (DEBUG) {
-    m_vmpeak = get_proc_status(pidApp, "VmPeak:");
-    m_vmdata = get_proc_status(pidApp, "VmData:");
+  //   if (DEBUG) {
+  //     m_vmpeak = get_proc_status(pidApp, "VmPeak:");
+  //     m_vmdata = get_proc_status(pidApp, "VmData:");
 
-    LOG_INFO("VmPeak:%d KB VmData:%d KB minflt:%d KB\n", m_vmpeak, m_vmdata,
-             m_minflt >> 10);
-  }
+  //     LOG_INFO("VmPeak:%d KB VmData:%d KB minflt:%d KB\n", m_vmpeak,
+  //     m_vmdata,
+  //              m_minflt >> 10);
+  //   }
 
   return m_minflt;
 }
@@ -2510,11 +2472,10 @@ void watch_solution(pid_t pidApp, char *infile, int &ACflg, int isspj,
 
     if (first) {
       ptrace(PTRACE_SETOPTIONS, pidApp, NULL,
-             PTRACE_O_TRACESYSGOOD |
-                 PTRACE_O_TRACEEXIT
-                 // 有的发行版带的 PTRACE 不识别以下宏，可以注释掉
-                 | PTRACE_O_EXITKILL | PTRACE_O_TRACECLONE |
-                 PTRACE_O_TRACEFORK | PTRACE_O_TRACEVFORK
+             PTRACE_O_TRACESYSGOOD | PTRACE_O_TRACEEXIT
+             // 有的发行版带的 PTRACE 不识别以下宏，可以注释掉
+             //  | PTRACE_O_EXITKILL | PTRACE_O_TRACECLONE |
+             //  PTRACE_O_TRACEFORK | PTRACE_O_TRACEVFORK
 
       );
     }
@@ -2572,10 +2533,9 @@ void watch_solution(pid_t pidApp, char *infile, int &ACflg, int isspj,
      */
 
     if ((lang >= 3 && exitcode == 17) || exitcode == 0x05 || exitcode == 0 ||
-        exitcode == 133)
+        exitcode == 133 || exitcode == 23) {
       // go on and on
-      ;
-    else {
+    } else {
       if (DEBUG) {
         LOG_INFO("status>>8=%d\n", exitcode);
         psignal(exitcode, NULL);
@@ -2607,7 +2567,6 @@ void watch_solution(pid_t pidApp, char *infile, int &ACflg, int isspj,
         print_runtimeerror(strsignal(exitcode));
       }
 
-      // 杀死出问题的进程
       ptrace(PTRACE_KILL, pidApp, NULL, NULL);
       break;
     }
@@ -2681,20 +2640,24 @@ void watch_solution(pid_t pidApp, char *infile, int &ACflg, int isspj,
     } else {
       // do not limit JVM syscall for using different JVM
       // 对于非法的系统调用，给出具体编号给管理员参考
+      ACflg = OJ_RE;
 
       char error[BUFFER_SIZE];
-      sprintf(
-          error,
-          "[ERROR] solution_id:%d called a Forbidden system call:%u [%u]\n"
-          "TO FIX THIS, ask admin to add the CALLID into corresponding \n"
-          "LANG_XXV[] located at okcalls32/64.h and recompile judge_client. \n"
-          "if you are admin and you don't know what to do\n"
-          "中文解释查看知乎 https://zhuanlan.zhihu.com/p/24498599\n",
-          solution_id, call_id, (unsigned int)reg.REG_SYSCALL);
+      sprintf(error,
+              "[ERROR] A Not allowed system call: runid:%d CALLID:%ld\n"
+              " TO FIX THIS , ask admin to add the CALLID into corresponding "
+              "LANG_XXV[] located at okcalls32/64.h ,\n"
+              "and recompile judge_client. \n"
+              "if you are admin and you don't know what to do ,\n"
+              "chinese explaination can be found on "
+              "https://zhuanlan.zhihu.com/p/24498599\n",
+              solution_id, call_id, (unsigned int)reg.REG_SYSCALL);
 
       write_log(error);
       print_runtimeerror(error);
       ptrace(PTRACE_KILL, pidApp, NULL, NULL);
+
+      break;
     }
 
     call_id = 0;
@@ -3125,10 +3088,6 @@ int main(int argc, char **argv) {
 
     init_syscalls_limits(lang);
 
-    if (use_ptrace) {
-      LOG_INFO("USE_PTRACE");
-    }
-
     pid_t pidApp = fork();
     if (pidApp == 0) {
       run_solution(lang, work_dir, time_lmt, usedtime, mem_lmt);
@@ -3172,8 +3131,8 @@ int main(int argc, char **argv) {
     LOG_INFO("sim_enable = %d\n", sim_enable);
   }
 
-  if (sim_enable && ACflg == OJ_AC &&
-      (!oi_mode || finalACflg == OJ_AC)) {  // bash don't supported
+  if (sim_enable && ACflg == OJ_AC && (!oi_mode || finalACflg == OJ_AC)) {
+    // bash don't supported
     sim = get_sim(solution_id, lang, p_id, sim_s_id);
   } else {
     sim = 0;
