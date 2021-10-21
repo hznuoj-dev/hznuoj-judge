@@ -2071,6 +2071,8 @@ void copy_js_runtime(char *work_dir) {
 
 void run_solution(int &lang, char *work_dir, int &time_lmt, int &usedtime,
                   int &mem_lmt) {
+  // child
+
   char *const envp[] = {(char *const)"PYTHONIOENCODING=utf-8",
                         (char *const)"LANG=zh_CN.UTF-8",
                         (char *const)"LANGUAGE=zh_CN.UTF-8",
