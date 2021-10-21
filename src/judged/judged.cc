@@ -87,9 +87,11 @@ void write_log(const char *fmt, ...) {
   va_start(ap, fmt);
   vsprintf(buffer, fmt, ap);
   fprintf(fp, "%s\n", buffer);
+
   if (DEBUG) {
     printf("%s\n", buffer);
   }
+
   va_end(ap);
   fclose(fp);
 }
@@ -332,11 +334,14 @@ int _get_jobs_http(int *jobs) {
       "wget --post-data=\"getpending=1&oj_lang_set=%s&max_running=%d\" "
       "--load-cookies=cookie --save-cookies=cookie --keep-session-cookies -q "
       "-O - \"%s/admin/problem_judge.php\"";
+
   FILE *fjobs = read_cmd_output(cmd, oj_lang_set, max_running, http_baseurl);
+
   while (fscanf(fjobs, "%s", buf) != EOF) {
     int sid = atoi(buf);
     if (sid > 0) jobs[i++] = sid;
   }
+
   pclose(fjobs);
   ret = i;
   while (i <= max_running * 2) jobs[i++] = 0;
@@ -397,8 +402,14 @@ int _get_jobs_redis(int *jobs) {
   }
 
   int i = ret;
-  while (i <= max_running * 2) jobs[i++] = 0;
-  if (DEBUG) printf("redis return %d jobs", ret);
+  while (i <= max_running * 2) {
+    jobs[i++] = 0;
+  }
+
+  if (DEBUG) {
+    printf("redis return %d jobs", ret);
+  }
+
   return ret;
 }
 
@@ -421,10 +432,12 @@ int get_jobs(int *jobs) {
 #ifdef _mysql_h
 bool _check_out_mysql(int solution_id, int result) {
   char sql[BUFFER_SIZE];
+
   sprintf(sql,
           "UPDATE solution SET result=%d,time=0,memory=0,judgetime=NOW() WHERE "
           "solution_id=%d and result<2 LIMIT 1",
           result, solution_id);
+
   if (mysql_real_query(conn, sql, strlen(sql))) {
     syslog(LOG_ERR | LOG_DAEMON, "%s", mysql_error(conn));
     return false;
@@ -440,11 +453,13 @@ bool _check_out_mysql(int solution_id, int result) {
 
 bool _check_out_http(int solution_id, int result) {
   login();
+
   const char *cmd =
       "wget --post-data=\"checkout=1&sid=%d&result=%d\" --load-cookies=cookie "
       "--save-cookies=cookie --keep-session-cookies -q -O - "
       "\"%s/admin/problem_judge.php\"";
   int ret = 0;
+
   FILE *fjobs = read_cmd_output(cmd, solution_id, result, http_baseurl);
   fscanf(fjobs, "%d", &ret);
   pclose(fjobs);
@@ -623,9 +638,11 @@ int daemon_init(void) {
   close(2); /* close stderr */
 
   int fd = open("/dev/null", O_RDWR);
+
   dup2(fd, 0);
   dup2(fd, 1);
   dup2(fd, 2);
+
   if (fd > 2) {
     close(fd);
   }
