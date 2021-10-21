@@ -3212,7 +3212,6 @@ int main(int argc, char **argv) {
   }
 
   if (sim_enable && ACflg == OJ_AC && (!oi_mode || finalACflg == OJ_AC)) {
-    // bash don't supported
     sim = get_sim(solution_id, lang, p_id, sim_s_id);
   } else {
     sim = 0;
