@@ -36,7 +36,7 @@ Like below:
 
 <p align="center">
 
-<img src="./screenshots/df -hT.png" />
+<img src="./images/df -hT.png" />
 
 </p>
 
