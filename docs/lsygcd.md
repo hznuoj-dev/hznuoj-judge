@@ -148,7 +148,7 @@ WantedBy=multi-user.target
 #
 # By default this script does nothing.
 
-sudo ./home/judge/startLsyncd.sh
+sudo /home/judge/startLsyncd.sh
 ```
 
 ##### Give permission to rc.local
