@@ -2976,6 +2976,10 @@ int main(int argc, char **argv) {
   // set work directory to start running & judging
   sprintf(work_dir, "%s/run%s/", oj_home, argv[2]);
 
+  if (access(work_dir, F_OK) == -1) {
+    execute_cmd("mkdir -p %s", work_dir);
+  }
+
   clean_workdir(work_dir);
 
   if (shm_run) {
