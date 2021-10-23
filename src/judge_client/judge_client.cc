@@ -2836,16 +2836,22 @@ int get_sim(int solution_id, int lang, int pid, int &sim_s_id) {
 }
 
 void mk_shm_workdir(char *work_dir) {
+  // if you run judge_client in docker
+  // the compiled program may noy be executed
   char shm_path[BUFFER_SIZE];
-  sprintf(shm_path, "/dev/shm/hustoj/%s", work_dir);
+  if (access(work_dir, F_OK) == 0) {
+    execute_cmd("/bin/rm -rf %s", work_dir);
+  }
+
+  sprintf(shm_path, "/dev/shm/hznuoj/%s", work_dir);
   execute_cmd("/bin/mkdir -p %s  2>/dev/null", shm_path);
   execute_cmd("/bin/ln -s %s %s/  2>/dev/null", shm_path, oj_home);
   execute_cmd("/bin/chown judge %s  2>/dev/null", shm_path);
   execute_cmd("chmod 755 %s  2>/dev/null", shm_path);
 
   // sim need a soft link in shm_dir to work correctly
-  sprintf(shm_path, "/dev/shm/hustoj/%s/", oj_home);
-  execute_cmd("/bin/ln -s %s/data %s  2>/dev/null", oj_home, shm_path);
+  // sprintf(shm_path, "/dev/shm/hznuoj/%s/", oj_home);
+  // execute_cmd("/bin/ln -s %s/data %s  2>/dev/null", oj_home, shm_path);
 }
 
 int count_in_files(char *dirpath) {
@@ -2976,11 +2982,12 @@ int main(int argc, char **argv) {
   // set work directory to start running & judging
   sprintf(work_dir, "%s/run%s/", oj_home, argv[2]);
 
-  if (access(work_dir, F_OK) == -1) {
-    execute_cmd("mkdir -p %s", work_dir);
+  if (access(work_dir, F_OK) == 0) {
+    clean_workdir(work_dir);
+    execute_cmd("/bin/rm -rf %s", work_dir);
   }
 
-  clean_workdir(work_dir);
+  execute_cmd("/bin/mkdir -p %s", work_dir);
 
   if (shm_run) {
     mk_shm_workdir(work_dir);

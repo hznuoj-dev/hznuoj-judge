@@ -2,7 +2,7 @@
 
 set -e -x
 
-judged
+# judged
 
 if [ -z "$*" ]; then
   /bin/bash
