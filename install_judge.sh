@@ -37,6 +37,10 @@ mkdir -p /home/judge/run0
 mkdir -p /home/judge/run1
 mkdir -p /home/judge/run2
 mkdir -p /home/judge/run3
+mkdir -p /home/judge/run4
+mkdir -p /home/judge/run5
+mkdir -p /home/judge/run6
+mkdir -p /home/judge/run7
 
 cp "${INSTALL_JUDGE_SH_TOP_DIR}"/src/judged/java0.policy /home/judge/etc
 cp "${INSTALL_JUDGE_SH_TOP_DIR}"/src/judged/judge.conf /home/judge/etc

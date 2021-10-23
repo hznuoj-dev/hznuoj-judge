@@ -7,6 +7,7 @@ PATH=/sbin:/usr/sbin:/bin:/usr/bin:/usr/local/bin
 DESC="Judge Service of HZNU Online Judge"
 NAME=judged
 DAEMON=/usr/bin/$NAME
+# shellcheck disable=SC2034
 DAEMON_ARGS=""
 PIDFILE=/var/run/$NAME.pid
 SCRIPTNAME=/etc/init.d/$NAME

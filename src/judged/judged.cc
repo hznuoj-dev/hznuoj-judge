@@ -217,7 +217,7 @@ void run_client(int runid, int clientid) {
   sprintf(runidstr, "%d", runid);
   sprintf(buf, "%d", clientid);
 
-  // write_log("sid=%s\tclient=%s\toj_home=%s\n",runidstr,buf,oj_home);
+  write_log("sid=%s\tclient=%s\toj_home=%s\n", runidstr, buf, oj_home);
   // sprintf(err,"%s/run%d/error.out",oj_home,clientid);
   // freopen(err,"a+",stderr);
 
@@ -482,20 +482,14 @@ bool check_out(int solution_id, int result) {
 }
 
 int work() {
-  //      char buf[1024];
   static int retcnt = 0;
   int i = 0;
   static pid_t ID[100];
   static int workcnt = 0;
   int runid = 0;
   int jobs[max_running * 2 + 1];
+
   pid_t tmp_pid = 0;
-
-  // for(i=0;i<max_running;i++){
-  //      ID[i]=0;
-  //}
-
-  // sleep_time=sleep_tmp;
 
   /* get the database info */
   if (!get_jobs(jobs)) {
@@ -510,9 +504,7 @@ int work() {
       continue;
     }
 
-    if (DEBUG) {
-      write_log("Judging solution %d", runid);
-    }
+    write_log("Judging solution %d", runid);
 
     if (workcnt >= max_running) {          // if no more client can running
       tmp_pid = waitpid(-1, NULL, 0);      // wait 4 one child exit
@@ -532,16 +524,16 @@ int work() {
     if (i < max_running) {
       if (workcnt < max_running && check_out(runid, OJ_CI)) {
         workcnt++;
-        ID[i] = fork();  // start to fork
-        if (ID[i] == 0) {
-          if (DEBUG) {
-            write_log("<<=sid=%d===clientid=%d==>>\n", runid, i);
-          }
 
-          run_client(runid, i);  // if the process is the son, run it
+        // start to fork
+        ID[i] = fork();
+        if (ID[i] == 0) {
+          write_log("<<=sid=%d===clientid=%d==>>\n", runid, i);
+
+          // if the process is the son, run it
+          run_client(runid, i);
           exit(0);
         }
-
       } else {
         ID[i] = 0;
       }
@@ -549,15 +541,16 @@ int work() {
   }
 
   while ((tmp_pid = waitpid(-1, NULL, 0)) > 0) {
-    for (i = 0; i < max_running; i++) {  // get the client id
+    // get the client id
+    for (i = 0; i < max_running; i++) {
       if (ID[i] == tmp_pid) {
         workcnt--;
         retcnt++;
         ID[i] = 0;
-        break;  // got the client id
+        break;
       }
     }
-    printf("tmp_pid = %d\n", tmp_pid);
+    write_log("tmp_pid = %d\n", tmp_pid);
   }
 
   if (!http_judge) {
@@ -570,7 +563,7 @@ int work() {
 #endif
   }
 
-  if (DEBUG && retcnt) {
+  if (retcnt) {
     write_log("<<%ddone!>>", retcnt);
   }
 
@@ -623,7 +616,7 @@ int daemon_init(void) {
   if ((pid = fork()) < 0) {
     return (-1);
   } else if (pid != 0) {
-    exit(0); /* parent exit */
+    exit(0);  // parent exit
   }
 
   /* child continues */
@@ -691,9 +684,10 @@ int main(int argc, char **argv) {
     system("/sbin/iptables -A OUTPUT -m owner --uid-owner judge -j DROP");
   }
 
-//	struct timespec final_sleep;
-//	final_sleep.tv_sec=0;
-//	final_sleep.tv_nsec=500000000;
+  //	struct timespec final_sleep;
+  //	final_sleep.tv_sec=0;
+  //	final_sleep.tv_nsec=500000000;
+
 #ifdef _mysql_h
   init_mysql_conf();  // set the database info
 #endif
