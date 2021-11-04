@@ -239,7 +239,7 @@ int executesql(const char *sql) {
       write_log("%s", mysql_error(conn));
     }
 
-    sleep(20);
+    sleep(sleep_time);
     conn = NULL;
     return 1;
   } else
@@ -263,7 +263,7 @@ int init_mysql() {
         write_log("%s", mysql_error(conn));
       }
 
-      sleep(2);
+      sleep(sleep_time);
       return 1;
     } else {
       return 0;
@@ -355,7 +355,7 @@ int _get_jobs_mysql(int *jobs) {
       write_log("%s", mysql_error(conn));
     }
 
-    sleep(20);
+    sleep(sleep_time);
     return 0;
   }
 
