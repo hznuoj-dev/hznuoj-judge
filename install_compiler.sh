@@ -29,24 +29,22 @@ apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys FF3AEACEF6F882
 apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys 3FA7E0328081BFF6A14DA29AA6A19B38D3D831EF
 
 # Add sources
-echo "deb http://ppa.launchpad.net/ubuntu-toolchain-r/test/ubuntu focal main" > /etc/apt/sources.list.d/ubuntu-toolchain-r-ubuntu-test-focal.list
-echo "deb http://apt.llvm.org/focal/ llvm-toolchain-focal-11 main" > /etc/apt/sources.list.d/llvm.list
-echo "deb http://ppa.launchpad.net/deadsnakes/ppa/ubuntu focal main" > /etc/apt/sources.list.d/python.list
-echo "deb http://ppa.launchpad.net/longsleep/golang-backports/ubuntu focal main" >  /etc/apt/sources.list.d/go.list
-echo "deb http://ppa.launchpad.net/ondrej/php/ubuntu focal main" > /etc/apt/sources.list.d/php.list
-echo "deb http://ppa.launchpad.net/hvr/ghc/ubuntu focal main" > /etc/apt/sources.list.d/haskell.list
-echo "deb https://download.mono-project.com/repo/ubuntu stable-focal main" > /etc/apt/sources.list.d/mono.list
+echo "deb http://ppa.launchpad.net/ubuntu-toolchain-r/test/ubuntu focal main" >/etc/apt/sources.list.d/ubuntu-toolchain-r-ubuntu-test-focal.list
+echo "deb http://apt.llvm.org/focal/ llvm-toolchain-focal-11 main" >/etc/apt/sources.list.d/llvm.list
+echo "deb http://ppa.launchpad.net/deadsnakes/ppa/ubuntu focal main" >/etc/apt/sources.list.d/python.list
+echo "deb http://ppa.launchpad.net/longsleep/golang-backports/ubuntu focal main" >/etc/apt/sources.list.d/go.list
+echo "deb http://ppa.launchpad.net/ondrej/php/ubuntu focal main" >/etc/apt/sources.list.d/php.list
+echo "deb http://ppa.launchpad.net/hvr/ghc/ubuntu focal main" >/etc/apt/sources.list.d/haskell.list
+echo "deb https://download.mono-project.com/repo/ubuntu stable-focal main" >/etc/apt/sources.list.d/mono.list
 
 apt-get update
 
-deps="make libmysql++-dev g++-11-multilib gcc-11-multilib clang-11 libc++-11-dev libc++abi-11-dev openjdk-11-jdk fpc python2.7 python3.9 golang-go php-cli ghc mono-devel fsharp ruby-full lua5.3"
+deps="make libmysql++-dev g++-11 gcc-11 clang-11 libc++-11-dev libc++abi-11-dev openjdk-11-jdk fpc python2.7 python3.9 golang-go php-cli ghc mono-devel fsharp ruby-full lua5.3"
 
-for pkg in ${deps}
-do
+for pkg in ${deps}; do
   install_ok='n'
 
-  for i in $(seq 10)
-  do
+  for i in $(seq 10); do
     if ! apt-get install -y "${pkg}"; then
       echo "Network error, install ${pkg} failure, number of retries: ${i}"
     else
