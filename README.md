@@ -1,5 +1,8 @@
 # hznuoj-judge
 
+[![Build Compiler](https://github.com/hznuoj-dev/hznuoj-judge/actions/workflows/build_compiler.yml/badge.svg)](https://github.com/hznuoj-dev/hznuoj-judge/actions/workflows/build_compiler.yml)
+[![Build Judge](https://github.com/hznuoj-dev/hznuoj-judge/actions/workflows/build_judge.yml/badge.svg)](https://github.com/hznuoj-dev/hznuoj-judge/actions/workflows/build_judge.yml)
+
 It's based on Ubuntu 20.04 and contains compilers (and interpreters) below:
 
 * GCC 11 (from [PPA](https://launchpad.net/~ubuntu-toolchain-r/+archive/ubuntu/test))
