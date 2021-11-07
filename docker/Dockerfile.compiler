@@ -6,7 +6,7 @@ WORKDIR /root/
 COPY ./ ./hznuoj-judge
 
 RUN sed -i s@/archive.ubuntu.com/@/mirrors.aliyun.com/@g /etc/apt/sources.list \
-  && bash /root/hznuoj-judge/install_sandbox.sh \
+  && bash /root/hznuoj-judge/install_compiler.sh \
   && rm -rf /root/hznuoj-judge
 
 CMD ["/bin/bash"]

@@ -1,4 +1,4 @@
-FROM hznuoj-sandbox:latest
+FROM hznuoj-compiler:latest
 
 USER root
 WORKDIR /root/

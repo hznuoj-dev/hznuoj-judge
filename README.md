@@ -32,7 +32,7 @@ docker build -t hznuoj-judge:latest -f docker/Dockerfile ./
 Step-by-step build:
 
 ```bash
-docker build -t hznuoj-sandbox:latest -f docker/Dockerfile.sandbox ./
+docker build -t hznuoj-compiler:latest -f docker/Dockerfile.compiler ./
 docker build -t hznuoj-judge:latest -f docker/Dockerfile.judge ./
 ```
 
