@@ -24,6 +24,7 @@ It's based on Ubuntu 20.04 and contains compilers (and interpreters) below:
 Each compiler (or interpreter) is available in `$PATH`.
 
 ## Use Docker
+
 ### Build
 
 Direct build:
@@ -42,11 +43,16 @@ docker build -t hznuoj-judge:latest -f docker/Dockerfile.judge ./
 ### Start
 
 ```bash
-docker run -it --privileged=true --cap-add=SYS_PTRACE --shm-size="2g" --restart=always -d \
---name=hznuoj-judge \
--v /var/hznuoj-judge/judge.conf:/home/judge/etc/judge.conf \
--v /var/hznuoj-judge/data:/home/judge/data \
-hznuoj-judge:latest
+docker run \
+  -d -it \
+  --privileged=true \
+  --cap-add=SYS_PTRACE \
+  --shm-size="2g" \
+  --restart=always \
+  --name=hznuoj-judge \
+  -v /var/hznuoj-judge/judge.conf:/home/judge/etc/judge.conf \
+  -v /var/hznuoj-judge/data:/home/judge/data \
+  hznuoj-judge:latest
 ```
 
 ### Exec
